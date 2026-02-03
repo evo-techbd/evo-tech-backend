@@ -1,0 +1,21 @@
+node_modules/
+.env
+.env.local
+.env.production
+.env.subdomain
+*.log
+coverage/
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+.cache/
+# Ignore specific development/test scripts but keep production-needed ones
+scripts/create-orders-for-user.js
+scripts/seed-*.js
+scripts/seed-*.ts
+scripts/check-*.ts
+scripts/fix-*.ts
+scripts/list-*.ts
+scripts/update-*.ts

@@ -1,0 +1,1 @@
+{"version":3,"file":"finance.service.d.ts","sourceRoot":"","sources":["../../../../src/app/modules/finance/finance.service.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,mBAAmB,EAAE,MAAM,qBAAqB,CAAC;AAmK1D,eAAO,MAAM,eAAe;oCAhKiB,mBAAmB;;;;;sCAKjB,MAAM,CAAC,MAAM,EAAE,OAAO,CAAC;;;;;;;;;;;;;;;;;;;;8CAgGf,MAAM,CAAC,MAAM,EAAE,OAAO,CAAC;;;;;;;;;CAgE7E,CAAC"}

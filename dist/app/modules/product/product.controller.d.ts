@@ -1,0 +1,33 @@
+export declare const ProductControllers: {
+    getAllProducts: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    getSingleProduct: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    getProductBySlug: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    createProduct: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    updateProduct: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    deleteProduct: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    getProductImages: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    addProductImage: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    deleteProductImage: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    getFeatureHeaders: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    addFeatureHeader: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    updateFeatureHeader: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    deleteFeatureHeader: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    getFeatureSubsections: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    addFeatureSubsection: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    updateFeatureSubsection: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    deleteFeatureSubsection: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    getSpecifications: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    addSpecification: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    updateSpecification: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    deleteSpecification: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    getColorVariations: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    addColorVariation: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    updateColorVariation: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    deleteColorVariation: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    getAllUniqueColors: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    getAllFeaturedSections: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    createFeaturedSection: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    updateFeaturedSection: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    deleteFeaturedSection: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+};
+//# sourceMappingURL=product.controller.d.ts.map

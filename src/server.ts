@@ -24,16 +24,31 @@ process.on("unhandledRejection", (error) => {
   }
 });
 
-async function bootstrap() {
+// Connect to database on startup
+let dbConnected = false;
+async function connectDB() {
+  if (dbConnected) return;
+  
   try {
     await mongoose.connect(config.db_url as string);
     console.log("🛢 Database connected successfully");
+    dbConnected = true;
 
     // Seed admin user if not exists
     await seedAdmin();
     
     // Seed test orders (comment out after first run if you don't want to add more)
     // await seedTestOrders();
+  } catch (err) {
+    console.error("Failed to connect to database:", err);
+    throw err;
+  }
+}
+
+// For traditional server deployment
+async function bootstrap() {
+  try {
+    await connectDB();
 
     server = app.listen(config.port, () => {
       console.log(`🚀 Application is running on port ${config.port}`);
@@ -47,12 +62,25 @@ async function bootstrap() {
     
     console.log('⏱️  Server timeouts configured: 5 minutes');
   } catch (err) {
-    console.error("Failed to connect to database:", err);
+    console.error("Failed to start server:", err);
     process.exit(1);
   }
 }
 
-bootstrap();
+// Only run bootstrap if not in Vercel (serverless)
+if (process.env.VERCEL !== '1') {
+  bootstrap();
+}
+
+// For Vercel serverless deployment
+// Export the Express app and ensure DB connection
+export default async (req: any, res: any) => {
+  await connectDB();
+  return app(req, res);
+};
+
+// Also export the app for direct import
+export { app };
 
 process.on("SIGTERM", () => {
   console.log("SIGTERM received");

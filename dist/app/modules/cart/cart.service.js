@@ -10,7 +10,15 @@ const http_status_1 = __importDefault(require("http-status"));
 const product_model_1 = require("../product/product.model");
 // Cart Services
 const getCartFromDB = async (userUuid) => {
-    const cart = await cart_model_1.Cart.find({ user: userUuid }).populate("product");
+    const cart = await cart_model_1.Cart.find({ user: userUuid }).populate({
+        path: "product",
+        select: "name slug price mainImage category subcategory brand weight isPreOrder preOrderPrice stock lowStockThreshold inStock",
+        populate: [
+            { path: "category", select: "name slug" },
+            { path: "subcategory", select: "name slug" },
+            { path: "brand", select: "name slug" }
+        ]
+    });
     return cart;
 };
 const addToCartIntoDB = async (payload) => {
@@ -42,7 +50,15 @@ const updateCartItemIntoDB = async (cartItemId, userUuid, payload) => {
     }
     const result = await cart_model_1.Cart.findByIdAndUpdate(cartItemId, payload, {
         new: true,
-    }).populate("product");
+    }).populate({
+        path: "product",
+        select: "name slug price mainImage category subcategory brand weight isPreOrder preOrderPrice stock lowStockThreshold inStock",
+        populate: [
+            { path: "category", select: "name slug" },
+            { path: "subcategory", select: "name slug" },
+            { path: "brand", select: "name slug" }
+        ]
+    });
     return result;
 };
 const removeCartItemFromDB = async (cartItemId, userUuid) => {
@@ -59,7 +75,15 @@ const clearCartFromDB = async (userUuid) => {
 };
 // Wishlist Services
 const getWishlistFromDB = async (userUuid) => {
-    const wishlist = await cart_model_1.Wishlist.find({ user: userUuid }).populate("product");
+    const wishlist = await cart_model_1.Wishlist.find({ user: userUuid }).populate({
+        path: "product",
+        select: "name slug price mainImage category subcategory brand weight isPreOrder preOrderPrice stock lowStockThreshold inStock",
+        populate: [
+            { path: "category", select: "name slug" },
+            { path: "subcategory", select: "name slug" },
+            { path: "brand", select: "name slug" }
+        ]
+    });
     return wishlist;
 };
 const addToWishlistIntoDB = async (payload) => {

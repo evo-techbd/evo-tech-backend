@@ -24,6 +24,8 @@ const terms_route_1 = require("../modules/terms/terms.route");
 const review_route_1 = require("../modules/review/review.route");
 const finance_route_1 = require("../modules/finance/finance.route");
 const taxonomy_route_1 = require("../modules/taxonomy/taxonomy.route");
+const page_content_route_1 = require("../modules/page-content/page-content.route");
+const faq_route_1 = require("../modules/faq/faq.route");
 const router = express_1.default.Router();
 const adminRouter = express_1.default.Router();
 // Admin prefix aliases to match frontend expectations
@@ -114,6 +116,14 @@ const moduleRoutes = [
     {
         path: "/taxonomy",
         route: taxonomy_route_1.TaxonomyRoutes,
+    },
+    {
+        path: "/page-content",
+        route: page_content_route_1.PageContentRoutes,
+    },
+    {
+        path: "/faqs",
+        route: faq_route_1.FaqRoutes,
     },
     {
         path: "/admin",

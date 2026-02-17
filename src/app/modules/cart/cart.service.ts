@@ -6,7 +6,15 @@ import { Product } from "../product/product.model";
 
 // Cart Services
 const getCartFromDB = async (userUuid: string) => {
-  const cart = await Cart.find({ user: userUuid }).populate("product");
+  const cart = await Cart.find({ user: userUuid }).populate({
+    path: "product",
+    select: "name slug price mainImage category subcategory brand weight isPreOrder preOrderPrice stock lowStockThreshold inStock",
+    populate: [
+      { path: "category", select: "name slug" },
+      { path: "subcategory", select: "name slug" },
+      { path: "brand", select: "name slug" }
+    ]
+  });
   return cart;
 };
 
@@ -48,7 +56,15 @@ const updateCartItemIntoDB = async (
 
   const result = await Cart.findByIdAndUpdate(cartItemId, payload, {
     new: true,
-  }).populate("product");
+  }).populate({
+    path: "product",
+    select: "name slug price mainImage category subcategory brand weight isPreOrder preOrderPrice stock lowStockThreshold inStock",
+    populate: [
+      { path: "category", select: "name slug" },
+      { path: "subcategory", select: "name slug" },
+      { path: "brand", select: "name slug" }
+    ]
+  });
 
   return result;
 };
@@ -70,7 +86,15 @@ const clearCartFromDB = async (userUuid: string) => {
 
 // Wishlist Services
 const getWishlistFromDB = async (userUuid: string) => {
-  const wishlist = await Wishlist.find({ user: userUuid }).populate("product");
+  const wishlist = await Wishlist.find({ user: userUuid }).populate({
+    path: "product",
+    select: "name slug price mainImage category subcategory brand weight isPreOrder preOrderPrice stock lowStockThreshold inStock",
+    populate: [
+      { path: "category", select: "name slug" },
+      { path: "subcategory", select: "name slug" },
+      { path: "brand", select: "name slug" }
+    ]
+  });
   return wishlist;
 };
 

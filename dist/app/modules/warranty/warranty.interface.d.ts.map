@@ -1,0 +1,1 @@
+{"version":3,"file":"warranty.interface.d.ts","sourceRoot":"","sources":["../../../../src/app/modules/warranty/warranty.interface.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,QAAQ,EAAE,MAAM,UAAU,CAAC;AAEpC,MAAM,WAAW,SAAU,SAAQ,QAAQ;IACzC,OAAO,EAAE,MAAM,CAAC;IAChB,OAAO,EAAE,MAAM,CAAC;IAChB,QAAQ,EAAE,OAAO,CAAC;IAClB,SAAS,EAAE,IAAI,CAAC;IAChB,SAAS,EAAE,IAAI,CAAC;CACjB"}

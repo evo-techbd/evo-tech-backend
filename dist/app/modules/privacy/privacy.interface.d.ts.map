@@ -1,0 +1,1 @@
+{"version":3,"file":"privacy.interface.d.ts","sourceRoot":"","sources":["../../../../src/app/modules/privacy/privacy.interface.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,QAAQ,EAAE,MAAM,UAAU,CAAC;AAEpC,MAAM,WAAW,QAAS,SAAQ,QAAQ;IACxC,OAAO,EAAE,MAAM,CAAC;IAChB,OAAO,EAAE,MAAM,CAAC;IAChB,QAAQ,EAAE,OAAO,CAAC;IAClB,SAAS,EAAE,IAAI,CAAC;IAChB,SAAS,EAAE,IAAI,CAAC;CACjB"}

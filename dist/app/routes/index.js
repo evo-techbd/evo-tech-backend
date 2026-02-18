@@ -21,6 +21,8 @@ const payment_route_1 = require("../modules/payment/payment.route");
 const coupon_route_1 = require("../modules/coupon/coupon.route");
 const notification_route_1 = require("../modules/notification/notification.route");
 const terms_route_1 = require("../modules/terms/terms.route");
+const privacy_route_1 = require("../modules/privacy/privacy.route");
+const warranty_route_1 = require("../modules/warranty/warranty.route");
 const review_route_1 = require("../modules/review/review.route");
 const finance_route_1 = require("../modules/finance/finance.route");
 const taxonomy_route_1 = require("../modules/taxonomy/taxonomy.route");
@@ -108,6 +110,14 @@ const moduleRoutes = [
     {
         path: "/terms",
         route: terms_route_1.TermsRoutes,
+    },
+    {
+        path: "/privacy",
+        route: privacy_route_1.PrivacyRoutes,
+    },
+    {
+        path: "/warranty",
+        route: warranty_route_1.WarrantyRoutes,
     },
     {
         path: "/",

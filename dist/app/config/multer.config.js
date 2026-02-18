@@ -26,8 +26,9 @@ const fileFilter = (req, file, cb) => {
 exports.multerUpload = (0, multer_1.default)({
     storage: storage,
     limits: {
-        fileSize: 10 * 1024 * 1024, // 10MB limit
+        fileSize: 2 * 1024 * 1024, // 2MB limit per file (after compression)
         files: 11, // Max 11 files (1 main + 10 additional)
+        fieldSize: 2 * 1024 * 1024, // 2MB field size
     },
     fileFilter: fileFilter,
 });

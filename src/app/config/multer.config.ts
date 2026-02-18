@@ -9,7 +9,7 @@ const fileFilter = (req: any, file: any, cb: any) => {
   console.log("🔍 [MULTER] File filter called for:", file.originalname);
   const allowedTypes = /jpeg|jpg|png|gif|webp/;
   const extname = allowedTypes.test(
-    path.extname(file.originalname).toLowerCase()
+    path.extname(file.originalname).toLowerCase(),
   );
   const mimetype = allowedTypes.test(file.mimetype);
 
@@ -25,8 +25,9 @@ const fileFilter = (req: any, file: any, cb: any) => {
 export const multerUpload = multer({
   storage: storage,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 2 * 1024 * 1024, // 2MB limit per file (after compression)
     files: 11, // Max 11 files (1 main + 10 additional)
+    fieldSize: 2 * 1024 * 1024, // 2MB field size
   },
   fileFilter: fileFilter,
 });

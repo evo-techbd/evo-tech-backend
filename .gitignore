@@ -19,3 +19,4 @@ scripts/check-*.ts
 scripts/fix-*.ts
 scripts/list-*.ts
 scripts/update-*.ts
+scripts/

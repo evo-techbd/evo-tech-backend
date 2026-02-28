@@ -1,4 +1,12 @@
 import { Types } from "mongoose";
+export interface TPickupPoint {
+    _id: string;
+    name: string;
+    address: string;
+    city?: string;
+    phone?: string;
+    hours?: string;
+}
 export interface TOrder {
     _id?: string;
     orderNumber: string;
@@ -15,7 +23,7 @@ export interface TOrder {
     postcode?: string;
     country: string;
     shippingType: string;
-    pickupPointId?: string;
+    pickupPointId?: string | TPickupPoint;
     paymentMethod: string;
     transactionId?: string;
     bkashTransactionId?: string;

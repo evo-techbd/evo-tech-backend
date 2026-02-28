@@ -23,9 +23,27 @@ exports.default = {
     cloudinary_cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     cloudinary_api_key: process.env.CLOUDINARY_API_KEY,
     cloudinary_api_secret: process.env.CLOUDINARY_API_SECRET,
-    cors_origin: process.env.NODE_ENV === "production"
-        ? process.env.CORS_ORIGIN.split(",").map((url) => url.trim())
-        : ["http://localhost:3000", "http://localhost:3001"],
+    cors_origin: (() => {
+        // Hardcoded allowed origins to prevent CORS issues
+        const hardcodedOrigins = [
+            "https://evo-tech-frontend-six.vercel.app",
+            "https://www.evo-techbd.com",
+            "https://evo-techbd.com",
+        ];
+        if (process.env.NODE_ENV === "production") {
+            const envOrigins = process.env.CORS_ORIGIN
+                ? process.env.CORS_ORIGIN.split(",").map((url) => url.trim())
+                : [];
+            return [...hardcodedOrigins, ...envOrigins];
+        }
+        else {
+            return [
+                "http://localhost:3000",
+                "http://localhost:3001",
+                ...hardcodedOrigins,
+            ];
+        }
+    })(),
     frontend_url: process.env.FRONTEND_URL || "http://localhost:3000",
     // bKash Payment Gateway Configuration
     bkash_base_url: process.env.SANDBOX === "true"

@@ -64,7 +64,15 @@ const orderSchema = new mongoose_1.Schema({
         required: true,
     },
     pickupPointId: {
-        type: String,
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: "PickupPoint",
+        set: function (v) {
+            // Convert empty strings to null to avoid cast errors during populate
+            if (v === "" || v === null || v === undefined) {
+                return null;
+            }
+            return v;
+        },
     },
     paymentMethod: {
         type: String,
@@ -168,6 +176,10 @@ const orderSchema = new mongoose_1.Schema({
     },
     trackingCode: {
         type: String,
+        set: function (v) {
+            // Trim whitespace
+            return v ? v.trim() : v;
+        },
     },
     viewed: {
         type: Boolean,

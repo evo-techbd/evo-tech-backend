@@ -65,7 +65,15 @@ const orderSchema = new Schema<TOrder>(
       required: true,
     },
     pickupPointId: {
-      type: String,
+      type: Schema.Types.ObjectId,
+      ref: "PickupPoint",
+      set: function (v: any) {
+        // Convert empty strings to null to avoid cast errors during populate
+        if (v === "" || v === null || v === undefined) {
+          return null;
+        }
+        return v;
+      },
     },
     paymentMethod: {
       type: String,
@@ -169,6 +177,10 @@ const orderSchema = new Schema<TOrder>(
     },
     trackingCode: {
       type: String,
+      set: function (v: string) {
+        // Trim whitespace
+        return v ? v.trim() : v;
+      },
     },
     viewed: {
       type: Boolean,
@@ -184,7 +196,7 @@ const orderSchema = new Schema<TOrder>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 const orderItemSchema = new Schema<TOrderItem>(
@@ -222,7 +234,7 @@ const orderItemSchema = new Schema<TOrderItem>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 export const Order = model<TOrder>("Order", orderSchema);

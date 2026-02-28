@@ -1,5 +1,14 @@
 import { Types } from "mongoose";
 
+export interface TPickupPoint {
+  _id: string;
+  name: string;
+  address: string;
+  city?: string;
+  phone?: string;
+  hours?: string;
+}
+
 export interface TOrder {
   _id?: string;
   orderNumber: string;
@@ -16,7 +25,7 @@ export interface TOrder {
   postcode?: string; // Optional - no longer collected
   country: string;
   shippingType: string;
-  pickupPointId?: string;
+  pickupPointId?: string | TPickupPoint; // Can be ID string or populated object
   paymentMethod: string;
   transactionId?: string;
   bkashTransactionId?: string; // bKash specific transaction ID

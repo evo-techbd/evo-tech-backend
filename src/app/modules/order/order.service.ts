@@ -3,10 +3,11 @@ import { TOrder, TOrderItem } from "./order.interface";
 import AppError from "../../errors/AppError";
 import httpStatus from "http-status";
 import { Product } from "../product/product.model";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import { NotificationServices } from "../notification/notification.service";
 import { emailService } from "../../utils/emailService";
 import { Review } from "../review/review.model";
+import { PickupPoint } from "../pickuppoint/pickuppoint.model"
 
 const generateOrderNumber = (): string => {
   const timestamp = Date.now().toString();
@@ -69,7 +70,7 @@ const roundToTwo = (value: number) => Math.round(value * 100) / 100;
 
 const calculateDepositBreakdown = (
   productDetails: Array<{ product: any; quantity: number }>,
-  totalPayable: number
+  totalPayable: number,
 ): DepositBreakdown => {
   let preOrderItemsCount = 0;
   let preOrderSubtotal = 0;
@@ -91,11 +92,11 @@ const calculateDepositBreakdown = (
   const deferredPreOrderPortion = roundToTwo(
     preOrderItemsCount > 0
       ? Math.max(preOrderSubtotal - preOrderDepositPortion, 0)
-      : 0
+      : 0,
   );
   const normalizedTotal = typeof totalPayable === "number" ? totalPayable : 0;
   const depositDue = roundToTwo(
-    Math.max(normalizedTotal - deferredPreOrderPortion, 0)
+    Math.max(normalizedTotal - deferredPreOrderPortion, 0),
   );
   const balanceDue = deferredPreOrderPortion;
 
@@ -111,7 +112,7 @@ const calculateDepositBreakdown = (
 
 const placeOrderIntoDB = async (
   payload: TOrder & { items: any[] },
-  userUuid: string
+  userUuid: string,
 ) => {
   const { items, ...orderData } = payload;
 
@@ -130,11 +131,11 @@ const placeOrderIntoDB = async (
     if (!product.isPreOrder) {
       const requestedQty = item.item_quantity;
       const availableStock = product.stock ?? 0;
-      
+
       if (!product.inStock || availableStock < requestedQty) {
         throw new AppError(
           httpStatus.BAD_REQUEST,
-          `Insufficient stock for "${product.name}". Requested: ${requestedQty}, Available: ${availableStock}`
+          `Insufficient stock for "${product.name}". Requested: ${requestedQty}, Available: ${availableStock}`,
         );
       }
     }
@@ -153,7 +154,7 @@ const placeOrderIntoDB = async (
         selectedColor: item.item_color || "",
         subtotal: product.price * item.item_quantity,
       };
-    })
+    }),
   );
 
   // Normalize phone number
@@ -169,7 +170,7 @@ const placeOrderIntoDB = async (
 
   const depositInfo = calculateDepositBreakdown(
     productDetails,
-    orderData.totalPayable || 0
+    orderData.totalPayable || 0,
   );
 
   Object.assign(orderData, depositInfo, {
@@ -204,20 +205,22 @@ const placeOrderIntoDB = async (
   // Get full order with items
   const fullOrder = await Order.findById(order._id);
   const orderItems = await OrderItem.find({ order: order._id }).populate(
-    "product"
+    "product",
   );
 
   // Send order confirmation email
   try {
     await emailService.sendOrderConfirmation({
       customerEmail: orderData.email,
-      customerName: `${orderData.firstname} ${orderData.lastname || ''}`.trim(),
+      customerName: `${orderData.firstname} ${orderData.lastname || ""}`.trim(),
       orderNumber: orderData.orderNumber,
-      trackingCode: orderData.trackingCode || '',
-      orderDate: new Date(fullOrder?.createdAt || Date.now()).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
+      trackingCode: orderData.trackingCode || "",
+      orderDate: new Date(
+        fullOrder?.createdAt || Date.now(),
+      ).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
       }),
       items: orderItems.map((item: any) => ({
         productName: item.productName,
@@ -230,18 +233,18 @@ const placeOrderIntoDB = async (
       deliveryCharge: orderData.deliveryCharge || 0,
       totalPayable: orderData.totalPayable || 0,
       shippingAddress: {
-        fullName: `${orderData.firstname} ${orderData.lastname || ''}`.trim(),
+        fullName: `${orderData.firstname} ${orderData.lastname || ""}`.trim(),
         phone: orderData.phone,
         address: orderData.houseStreet,
         city: orderData.city,
-        subdistrict: orderData.subdistrict || '',
+        subdistrict: orderData.subdistrict || "",
       },
       isPreOrderOrder: depositInfo.isPreOrderOrder,
       depositDue: depositInfo.depositDue,
       balanceDue: depositInfo.balanceDue,
     });
   } catch (emailError) {
-    console.error('Failed to send order confirmation email:', emailError);
+    console.error("Failed to send order confirmation email:", emailError);
     // Don't throw - we don't want to fail the order if email fails
   }
 
@@ -253,7 +256,7 @@ const placeOrderIntoDB = async (
 
 const getUserOrdersFromDB = async (
   userUuid: string,
-  query: Record<string, unknown>
+  query: Record<string, unknown>,
 ) => {
   const page = Number(query.page) || 1;
   const limit = Number(query.limit) || 10;
@@ -270,6 +273,7 @@ const getUserOrdersFromDB = async (
   }
 
   const result = await Order.find(searchQuery)
+    .populate("pickupPointId", "name address city phone hours")
     .skip(skip)
     .limit(limit)
     .sort({ createdAt: -1 })
@@ -281,7 +285,9 @@ const getUserOrdersFromDB = async (
       .map((order) => order._id)
       .filter(Boolean)
       .map((id) =>
-        typeof id === "string" ? new Types.ObjectId(id) : (id as Types.ObjectId)
+        typeof id === "string"
+          ? new Types.ObjectId(id)
+          : (id as Types.ObjectId),
       );
 
     if (orderIds.length) {
@@ -304,7 +310,7 @@ const getUserOrdersFromDB = async (
         counts.map((entry) => [
           entry._id.toString(),
           { quantity: entry.quantity, lines: entry.lines },
-        ])
+        ]),
       );
     }
   }
@@ -358,6 +364,7 @@ const getAllOrdersFromDB = async (query: Record<string, unknown>) => {
   }
 
   const result = await Order.find(searchQuery)
+    .populate("pickupPointId", "name address city phone hours")
     .skip(skip)
     .limit(limit)
     .sort({ createdAt: -1 });
@@ -367,18 +374,17 @@ const getAllOrdersFromDB = async (query: Record<string, unknown>) => {
   // Populate order items with product data including category
   const ordersWithItems = await Promise.all(
     result.map(async (order) => {
-      const orderItems = await OrderItem.find({ order: order._id })
-        .populate({
-          path: 'product',
-          populate: {
-            path: 'category',
-            select: 'name slug'
-          }
-        });
-      
+      const orderItems = await OrderItem.find({ order: order._id }).populate({
+        path: "product",
+        populate: {
+          path: "category",
+          select: "name slug",
+        },
+      });
+
       return {
         ...normalizeOrderObject(order),
-        orderItems: orderItems.map(item => ({
+        orderItems: orderItems.map((item) => ({
           _id: item._id,
           order: item.order,
           product: item.product,
@@ -389,9 +395,9 @@ const getAllOrdersFromDB = async (query: Record<string, unknown>) => {
           subtotal: item.subtotal,
           createdAt: item.createdAt,
           updatedAt: item.updatedAt,
-        }))
+        })),
       };
-    })
+    }),
   );
 
   return {
@@ -411,13 +417,16 @@ const getSingleOrderFromDB = async (orderId: string, userUuid?: string) => {
     query.user = userUuid;
   }
 
-  const order = await Order.findOne(query);
+  const order = await Order.findOne(query).populate(
+    "pickupPointId",
+    "name address city phone hours",
+  );
   if (!order) {
     throw new AppError(httpStatus.NOT_FOUND, "Order not found");
   }
 
   const orderItems = await OrderItem.find({ order: orderId }).populate(
-    "product"
+    "product",
   );
 
   return {
@@ -428,7 +437,7 @@ const getSingleOrderFromDB = async (orderId: string, userUuid?: string) => {
 
 const updateOrderStatusIntoDB = async (
   orderId: string,
-  payload: Partial<TOrder>
+  payload: Partial<TOrder>,
 ) => {
   const order = await Order.findById(orderId);
   if (!order) {
@@ -440,19 +449,23 @@ const updateOrderStatusIntoDB = async (
     payload.deliveredAt = new Date();
   }
 
-  // Calculate amountDue and auto-update payment status if amountPaid is provided
+  // Calculate amountDue if amountPaid is provided
   if (payload.amountPaid !== undefined) {
     const totalPayable = payload.totalPayable || order.totalPayable;
     const amountPaid = payload.amountPaid;
     payload.amountDue = totalPayable - amountPaid;
 
-    // Auto-calculate payment status based on amount paid
-    if (amountPaid >= totalPayable) {
-      payload.paymentStatus = "paid";
-    } else if (amountPaid > 0) {
-      payload.paymentStatus = "partial";
-    } else {
-      payload.paymentStatus = "pending";
+    // Only auto-calculate payment status if not explicitly provided
+    // or if explicitly set to one of the auto-calculated statuses
+    // This allows admins to manually set "failed", "refunded", etc.
+    if (payload.paymentStatus === undefined) {
+      if (amountPaid >= totalPayable) {
+        payload.paymentStatus = "paid";
+      } else if (amountPaid > 0) {
+        payload.paymentStatus = "partial";
+      } else {
+        payload.paymentStatus = "pending";
+      }
     }
   }
 
@@ -488,7 +501,7 @@ const placeGuestOrderIntoDB = async (payload: TOrder & { items: any[] }) => {
   if (!orderData.email) {
     throw new AppError(
       httpStatus.BAD_REQUEST,
-      "Email is required for guest checkout"
+      "Email is required for guest checkout",
     );
   }
 
@@ -502,11 +515,11 @@ const placeGuestOrderIntoDB = async (payload: TOrder & { items: any[] }) => {
     if (!product.isPreOrder) {
       const requestedQty = item.item_quantity || item.quantity;
       const availableStock = product.stock ?? 0;
-      
+
       if (!product.inStock || availableStock < requestedQty) {
         throw new AppError(
           httpStatus.BAD_REQUEST,
-          `Insufficient stock for "${product.name}". Requested: ${requestedQty}, Available: ${availableStock}`
+          `Insufficient stock for "${product.name}". Requested: ${requestedQty}, Available: ${availableStock}`,
         );
       }
     }
@@ -535,7 +548,7 @@ const placeGuestOrderIntoDB = async (payload: TOrder & { items: any[] }) => {
         selectedColor: item.item_color || item.selectedColor,
         subtotal: itemTotal,
       };
-    })
+    }),
   );
 
   // Normalize phone number
@@ -552,7 +565,7 @@ const placeGuestOrderIntoDB = async (payload: TOrder & { items: any[] }) => {
   // Compute deposit/balance data for guest orders
   const depositInfo = calculateDepositBreakdown(
     productDetails,
-    orderData.totalPayable || 0
+    orderData.totalPayable || 0,
   );
 
   Object.assign(orderData, depositInfo, {
@@ -587,7 +600,7 @@ const placeGuestOrderIntoDB = async (payload: TOrder & { items: any[] }) => {
   // Get full order with items
   const fullOrder = await Order.findById(order._id);
   const orderItems = await OrderItem.find({ order: order._id }).populate(
-    "product"
+    "product",
   );
 
   return {
@@ -616,7 +629,7 @@ const linkGuestOrdersToUserIntoDB = async (email: string, userUuid: string) => {
         user: userUuid,
         isGuest: false,
       },
-    }
+    },
   );
 
   return {
@@ -627,13 +640,36 @@ const linkGuestOrdersToUserIntoDB = async (email: string, userUuid: string) => {
 
 // Track order by tracking code - public endpoint (no auth required)
 const trackOrderByTrackingCode = async (trackingCode: string) => {
-  const order = await Order.findOne({ trackingCode }).lean();
+  // Trim whitespace from tracking code
+  const trimmedCode = trackingCode?.trim();
+
+  if (!trimmedCode) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "Tracking code is required",
+    );
+  }
+
+  // Find order first without populate to avoid casting errors
+  const order = await Order.findOne({ trackingCode: trimmedCode }).lean();
 
   if (!order) {
     throw new AppError(
       httpStatus.NOT_FOUND,
-      "Order not found with this tracking code"
+      "Order not found with this tracking code",
     );
+  }
+
+  // Manually populate pickupPointId only if it's a valid ObjectId
+  let pickupPoint: any = null;
+  if (
+    order.pickupPointId &&
+    typeof order.pickupPointId === "string" &&
+    mongoose.Types.ObjectId.isValid(order.pickupPointId)
+  ) {
+    pickupPoint = await PickupPoint.findById(order.pickupPointId)
+      .select("name address city phone hours")
+      .lean();
   }
 
   // Get order items
@@ -651,6 +687,12 @@ const trackOrderByTrackingCode = async (trackingCode: string) => {
       paymentMethod: order.paymentMethod,
       shippingType: order.shippingType,
       city: order.city,
+      // Address fields for express delivery
+      houseStreet: order.houseStreet,
+      subdistrict: order.subdistrict,
+      country: order.country,
+      // Pickup point details
+      pickupPoint: pickupPoint,
       subtotal: order.subtotal,
       discount: order.discount,
       deliveryCharge: order.deliveryCharge,
@@ -675,7 +717,10 @@ const trackOrderByTrackingCode = async (trackingCode: string) => {
 };
 
 // Get order items for review with review status
-const getOrderItemsForReviewFromDB = async (orderId: string, userUuid: string) => {
+const getOrderItemsForReviewFromDB = async (
+  orderId: string,
+  userUuid: string,
+) => {
   // First verify the order belongs to the user and is delivered
   const order = await Order.findById(orderId).lean();
 
@@ -685,12 +730,18 @@ const getOrderItemsForReviewFromDB = async (orderId: string, userUuid: string) =
 
   // Verify order belongs to user
   if (order.user !== userUuid) {
-    throw new AppError(httpStatus.FORBIDDEN, "You are not authorized to access this order");
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      "You are not authorized to access this order",
+    );
   }
 
   // Check if order is delivered
   if (order.orderStatus !== "delivered") {
-    throw new AppError(httpStatus.BAD_REQUEST, "Reviews can only be submitted for delivered orders");
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "Reviews can only be submitted for delivered orders",
+    );
   }
 
   // Get order items
@@ -700,10 +751,10 @@ const getOrderItemsForReviewFromDB = async (orderId: string, userUuid: string) =
 
   // Get reviews for this order
   const reviews = await Review.find({ order: order._id }).lean();
-  const reviewedProductIds = new Set(reviews.map(r => r.product.toString()));
+  const reviewedProductIds = new Set(reviews.map((r) => r.product.toString()));
 
   // Map items with review status
-  const itemsWithReviewStatus = orderItems.map(item => ({
+  const itemsWithReviewStatus = orderItems.map((item) => ({
     _id: item._id,
     product: item.product,
     productName: item.productName,

@@ -28,6 +28,7 @@ const finance_route_1 = require("../modules/finance/finance.route");
 const taxonomy_route_1 = require("../modules/taxonomy/taxonomy.route");
 const page_content_route_1 = require("../modules/page-content/page-content.route");
 const faq_route_1 = require("../modules/faq/faq.route");
+const pickuppoint_route_1 = require("../modules/pickuppoint/pickuppoint.route");
 const router = express_1.default.Router();
 const adminRouter = express_1.default.Router();
 // Admin prefix aliases to match frontend expectations
@@ -40,6 +41,7 @@ adminRouter.use("/orders", order_route_1.OrderRoutes);
 adminRouter.use("/users", user_route_1.UserRoutes);
 adminRouter.use("/banners", banner_route_1.BannerRoutes);
 adminRouter.use("/coupons", coupon_route_1.CouponRoutes);
+adminRouter.use("/pickup-points", pickuppoint_route_1.PickupPointRoutes);
 adminRouter.use("/dashboard", dashboard_route_1.DashboardRoutes);
 adminRouter.use("/finance", finance_route_1.FinanceRoutes);
 const moduleRoutes = [
@@ -134,6 +136,10 @@ const moduleRoutes = [
     {
         path: "/faqs",
         route: faq_route_1.FaqRoutes,
+    },
+    {
+        path: "/pickup-points",
+        route: pickuppoint_route_1.PickupPointRoutes,
     },
     {
         path: "/admin",

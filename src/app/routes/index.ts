@@ -23,6 +23,7 @@ import { FinanceRoutes } from "../modules/finance/finance.route";
 import { TaxonomyRoutes } from "../modules/taxonomy/taxonomy.route";
 import { PageContentRoutes } from "../modules/page-content/page-content.route";
 import { FaqRoutes } from "../modules/faq/faq.route";
+import { PickupPointRoutes } from "../modules/pickuppoint/pickuppoint.route";
 
 const router = express.Router();
 const adminRouter = express.Router();
@@ -37,6 +38,7 @@ adminRouter.use("/orders", OrderRoutes);
 adminRouter.use("/users", UserRoutes);
 adminRouter.use("/banners", BannerRoutes);
 adminRouter.use("/coupons", CouponRoutes);
+adminRouter.use("/pickup-points", PickupPointRoutes);
 adminRouter.use("/dashboard", DashboardRoutes);
 adminRouter.use("/finance", FinanceRoutes);
 
@@ -132,6 +134,10 @@ const moduleRoutes = [
   {
     path: "/faqs",
     route: FaqRoutes,
+  },
+  {
+    path: "/pickup-points",
+    route: PickupPointRoutes,
   },
   {
     path: "/admin",

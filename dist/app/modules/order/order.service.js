@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -8,10 +41,11 @@ const order_model_1 = require("./order.model");
 const AppError_1 = __importDefault(require("../../errors/AppError"));
 const http_status_1 = __importDefault(require("http-status"));
 const product_model_1 = require("../product/product.model");
-const mongoose_1 = require("mongoose");
+const mongoose_1 = __importStar(require("mongoose"));
 const notification_service_1 = require("../notification/notification.service");
 const emailService_1 = require("../../utils/emailService");
 const review_model_1 = require("../review/review.model");
+const pickuppoint_model_1 = require("../pickuppoint/pickuppoint.model");
 const generateOrderNumber = () => {
     const timestamp = Date.now().toString();
     const random = Math.floor(Math.random() * 10000)
@@ -164,13 +198,13 @@ const placeOrderIntoDB = async (payload, userUuid) => {
     try {
         await emailService_1.emailService.sendOrderConfirmation({
             customerEmail: orderData.email,
-            customerName: `${orderData.firstname} ${orderData.lastname || ''}`.trim(),
+            customerName: `${orderData.firstname} ${orderData.lastname || ""}`.trim(),
             orderNumber: orderData.orderNumber,
-            trackingCode: orderData.trackingCode || '',
-            orderDate: new Date(fullOrder?.createdAt || Date.now()).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
+            trackingCode: orderData.trackingCode || "",
+            orderDate: new Date(fullOrder?.createdAt || Date.now()).toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
             }),
             items: orderItems.map((item) => ({
                 productName: item.productName,
@@ -183,11 +217,11 @@ const placeOrderIntoDB = async (payload, userUuid) => {
             deliveryCharge: orderData.deliveryCharge || 0,
             totalPayable: orderData.totalPayable || 0,
             shippingAddress: {
-                fullName: `${orderData.firstname} ${orderData.lastname || ''}`.trim(),
+                fullName: `${orderData.firstname} ${orderData.lastname || ""}`.trim(),
                 phone: orderData.phone,
                 address: orderData.houseStreet,
                 city: orderData.city,
-                subdistrict: orderData.subdistrict || '',
+                subdistrict: orderData.subdistrict || "",
             },
             isPreOrderOrder: depositInfo.isPreOrderOrder,
             depositDue: depositInfo.depositDue,
@@ -195,7 +229,7 @@ const placeOrderIntoDB = async (payload, userUuid) => {
         });
     }
     catch (emailError) {
-        console.error('Failed to send order confirmation email:', emailError);
+        console.error("Failed to send order confirmation email:", emailError);
         // Don't throw - we don't want to fail the order if email fails
     }
     return {
@@ -215,6 +249,7 @@ const getUserOrdersFromDB = async (userUuid, query) => {
         searchQuery.paymentStatus = query.paymentStatus;
     }
     const result = await order_model_1.Order.find(searchQuery)
+        .populate("pickupPointId", "name address city phone hours")
         .skip(skip)
         .limit(limit)
         .sort({ createdAt: -1 })
@@ -224,7 +259,9 @@ const getUserOrdersFromDB = async (userUuid, query) => {
         const orderIds = result
             .map((order) => order._id)
             .filter(Boolean)
-            .map((id) => typeof id === "string" ? new mongoose_1.Types.ObjectId(id) : id);
+            .map((id) => typeof id === "string"
+            ? new mongoose_1.Types.ObjectId(id)
+            : id);
         if (orderIds.length) {
             const counts = await order_model_1.OrderItem.aggregate([
                 { $match: { order: { $in: orderIds } } },
@@ -283,23 +320,23 @@ const getAllOrdersFromDB = async (query) => {
         searchQuery.user = query.user;
     }
     const result = await order_model_1.Order.find(searchQuery)
+        .populate("pickupPointId", "name address city phone hours")
         .skip(skip)
         .limit(limit)
         .sort({ createdAt: -1 });
     const total = await order_model_1.Order.countDocuments(searchQuery);
     // Populate order items with product data including category
     const ordersWithItems = await Promise.all(result.map(async (order) => {
-        const orderItems = await order_model_1.OrderItem.find({ order: order._id })
-            .populate({
-            path: 'product',
+        const orderItems = await order_model_1.OrderItem.find({ order: order._id }).populate({
+            path: "product",
             populate: {
-                path: 'category',
-                select: 'name slug'
-            }
+                path: "category",
+                select: "name slug",
+            },
         });
         return {
             ...(0, exports.normalizeOrderObject)(order),
-            orderItems: orderItems.map(item => ({
+            orderItems: orderItems.map((item) => ({
                 _id: item._id,
                 order: item.order,
                 product: item.product,
@@ -310,7 +347,7 @@ const getAllOrdersFromDB = async (query) => {
                 subtotal: item.subtotal,
                 createdAt: item.createdAt,
                 updatedAt: item.updatedAt,
-            }))
+            })),
         };
     }));
     return {
@@ -328,7 +365,7 @@ const getSingleOrderFromDB = async (orderId, userUuid) => {
     if (userUuid) {
         query.user = userUuid;
     }
-    const order = await order_model_1.Order.findOne(query);
+    const order = await order_model_1.Order.findOne(query).populate("pickupPointId", "name address city phone hours");
     if (!order) {
         throw new AppError_1.default(http_status_1.default.NOT_FOUND, "Order not found");
     }
@@ -347,20 +384,24 @@ const updateOrderStatusIntoDB = async (orderId, payload) => {
     if (payload.orderStatus === "delivered" && !order.deliveredAt) {
         payload.deliveredAt = new Date();
     }
-    // Calculate amountDue and auto-update payment status if amountPaid is provided
+    // Calculate amountDue if amountPaid is provided
     if (payload.amountPaid !== undefined) {
         const totalPayable = payload.totalPayable || order.totalPayable;
         const amountPaid = payload.amountPaid;
         payload.amountDue = totalPayable - amountPaid;
-        // Auto-calculate payment status based on amount paid
-        if (amountPaid >= totalPayable) {
-            payload.paymentStatus = "paid";
-        }
-        else if (amountPaid > 0) {
-            payload.paymentStatus = "partial";
-        }
-        else {
-            payload.paymentStatus = "pending";
+        // Only auto-calculate payment status if not explicitly provided
+        // or if explicitly set to one of the auto-calculated statuses
+        // This allows admins to manually set "failed", "refunded", etc.
+        if (payload.paymentStatus === undefined) {
+            if (amountPaid >= totalPayable) {
+                payload.paymentStatus = "paid";
+            }
+            else if (amountPaid > 0) {
+                payload.paymentStatus = "partial";
+            }
+            else {
+                payload.paymentStatus = "pending";
+            }
         }
     }
     const result = await order_model_1.Order.findByIdAndUpdate(orderId, payload, {
@@ -492,9 +533,24 @@ const linkGuestOrdersToUserIntoDB = async (email, userUuid) => {
 };
 // Track order by tracking code - public endpoint (no auth required)
 const trackOrderByTrackingCode = async (trackingCode) => {
-    const order = await order_model_1.Order.findOne({ trackingCode }).lean();
+    // Trim whitespace from tracking code
+    const trimmedCode = trackingCode?.trim();
+    if (!trimmedCode) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, "Tracking code is required");
+    }
+    // Find order first without populate to avoid casting errors
+    const order = await order_model_1.Order.findOne({ trackingCode: trimmedCode }).lean();
     if (!order) {
         throw new AppError_1.default(http_status_1.default.NOT_FOUND, "Order not found with this tracking code");
+    }
+    // Manually populate pickupPointId only if it's a valid ObjectId
+    let pickupPoint = null;
+    if (order.pickupPointId &&
+        typeof order.pickupPointId === "string" &&
+        mongoose_1.default.Types.ObjectId.isValid(order.pickupPointId)) {
+        pickupPoint = await pickuppoint_model_1.PickupPoint.findById(order.pickupPointId)
+            .select("name address city phone hours")
+            .lean();
     }
     // Get order items
     const orderItems = await order_model_1.OrderItem.find({ order: order._id })
@@ -510,6 +566,12 @@ const trackOrderByTrackingCode = async (trackingCode) => {
             paymentMethod: order.paymentMethod,
             shippingType: order.shippingType,
             city: order.city,
+            // Address fields for express delivery
+            houseStreet: order.houseStreet,
+            subdistrict: order.subdistrict,
+            country: order.country,
+            // Pickup point details
+            pickupPoint: pickupPoint,
             subtotal: order.subtotal,
             discount: order.discount,
             deliveryCharge: order.deliveryCharge,
@@ -553,9 +615,9 @@ const getOrderItemsForReviewFromDB = async (orderId, userUuid) => {
         .lean();
     // Get reviews for this order
     const reviews = await review_model_1.Review.find({ order: order._id }).lean();
-    const reviewedProductIds = new Set(reviews.map(r => r.product.toString()));
+    const reviewedProductIds = new Set(reviews.map((r) => r.product.toString()));
     // Map items with review status
-    const itemsWithReviewStatus = orderItems.map(item => ({
+    const itemsWithReviewStatus = orderItems.map((item) => ({
         _id: item._id,
         product: item.product,
         productName: item.productName,

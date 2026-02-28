@@ -1,12 +1,12 @@
 import { TOrder, TOrderItem } from "./order.interface";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 export declare const normalizeOrderObject: (orderDoc: any) => any;
 export declare const OrderServices: {
     placeOrderIntoDB: (payload: TOrder & {
         items: any[];
     }, userUuid: string) => Promise<{
         order: any;
-        items: (import("mongoose").Document<unknown, {}, TOrderItem, {}, {}> & TOrderItem & Required<{
+        items: (mongoose.Document<unknown, {}, TOrderItem, {}, {}> & TOrderItem & Required<{
             _id: string;
         }> & {
             __v: number;
@@ -16,7 +16,7 @@ export declare const OrderServices: {
         items: any[];
     }) => Promise<{
         order: any;
-        items: (import("mongoose").Document<unknown, {}, TOrderItem, {}, {}> & TOrderItem & Required<{
+        items: (mongoose.Document<unknown, {}, TOrderItem, {}, {}> & TOrderItem & Required<{
             _id: string;
         }> & {
             __v: number;
@@ -46,18 +46,18 @@ export declare const OrderServices: {
     }>;
     getSingleOrderFromDB: (orderId: string, userUuid?: string) => Promise<{
         order: any;
-        items: (import("mongoose").Document<unknown, {}, TOrderItem, {}, {}> & TOrderItem & Required<{
+        items: (mongoose.Document<unknown, {}, TOrderItem, {}, {}> & TOrderItem & Required<{
             _id: string;
         }> & {
             __v: number;
         })[];
     }>;
-    updateOrderStatusIntoDB: (orderId: string, payload: Partial<TOrder>) => Promise<(import("mongoose").Document<unknown, {}, TOrder, {}, {}> & TOrder & Required<{
+    updateOrderStatusIntoDB: (orderId: string, payload: Partial<TOrder>) => Promise<(mongoose.Document<unknown, {}, TOrder, {}, {}> & TOrder & Required<{
         _id: string;
     }> & {
         __v: number;
     }) | null>;
-    deleteOrderFromDB: (orderId: string) => Promise<(import("mongoose").Document<unknown, {}, TOrder, {}, {}> & TOrder & Required<{
+    deleteOrderFromDB: (orderId: string) => Promise<(mongoose.Document<unknown, {}, TOrder, {}, {}> & TOrder & Required<{
         _id: string;
     }> & {
         __v: number;
@@ -71,6 +71,10 @@ export declare const OrderServices: {
             paymentMethod: string;
             shippingType: string;
             city: string;
+            houseStreet: string;
+            subdistrict: string | undefined;
+            country: string;
+            pickupPoint: any;
             subtotal: number;
             discount: number;
             deliveryCharge: number;

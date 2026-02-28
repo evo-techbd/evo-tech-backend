@@ -10,6 +10,7 @@ export declare const DashboardServices: {
         ordersGrowth: number;
         customersGrowth: number;
         productsGrowth: number;
+        orderBreakdown: Record<string, number>;
         profitWarning: {
             message: string;
             itemsAffected: number;

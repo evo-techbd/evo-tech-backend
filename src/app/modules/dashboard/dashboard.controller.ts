@@ -4,7 +4,10 @@ import { catchAsync } from "../../utils/catchAsync";
 import { DashboardServices } from "./dashboard.service";
 
 const getDashboardStats = catchAsync(async (req, res) => {
-  const result = await DashboardServices.getDashboardStats();
+  const { range } = req.query;
+  const result = await DashboardServices.getDashboardStats(
+    range as "today" | "this-week" | "this-month" | "all-time",
+  );
 
   sendResponse(res, {
     statusCode: httpStatus.OK,

@@ -2,38 +2,125 @@ import { User } from "../user/user.model";
 import { Order, OrderItem } from "../order/order.model";
 import { Product } from "../product/product.model";
 
-const getDashboardStats = async () => {
-  // Get current date and date ranges
+type DateRange = "today" | "this-week" | "this-month" | "all-time";
+
+const getDateRanges = (range: DateRange = "this-month") => {
   const now = new Date();
-  const lastMonth = new Date(
-    now.getFullYear(),
-    now.getMonth() - 1,
-    now.getDate(),
-  );
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+  let currentStart: Date;
+  let currentEnd: Date;
+  let previousStart: Date;
+  let previousEnd: Date;
+
+  switch (range) {
+    case "today":
+      // Today
+      currentStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      currentEnd = now;
+      // Yesterday
+      previousStart = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() - 1,
+      );
+      previousEnd = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        0,
+        0,
+        0,
+        -1,
+      );
+      break;
+
+    case "this-week":
+      // This week (Monday to Sunday)
+      const dayOfWeek = now.getDay();
+      const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      currentStart = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() + diffToMonday,
+      );
+      currentEnd = now;
+      // Last week
+      previousStart = new Date(
+        currentStart.getFullYear(),
+        currentStart.getMonth(),
+        currentStart.getDate() - 7,
+      );
+      previousEnd = new Date(
+        currentStart.getFullYear(),
+        currentStart.getMonth(),
+        currentStart.getDate(),
+        0,
+        0,
+        0,
+        -1,
+      );
+      break;
+
+    case "all-time":
+      // All time - start from earliest possible date
+      currentStart = new Date(2000, 0, 1);
+      currentEnd = now;
+      // Compare with a year ago
+      previousStart = new Date(
+        now.getFullYear() - 1,
+        now.getMonth(),
+        now.getDate(),
+      );
+      previousEnd = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        0,
+        0,
+        0,
+        -1,
+      );
+      break;
+
+    case "this-month":
+    default:
+      // This month
+      currentStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      currentEnd = now;
+      // Last month
+      previousStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      previousEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+      break;
+  }
+
+  return { currentStart, currentEnd, previousStart, previousEnd };
+};
+
+const getDashboardStats = async (range: DateRange = "this-month") => {
+  // Get current date and date ranges based on selected period
+  const now = new Date();
+  const { currentStart, currentEnd, previousStart, previousEnd } =
+    getDateRanges(range);
 
   // Get total counts - EXCLUDE CANCELLED ORDERS from revenue/profit calculations
-  const [totalUsers, totalProducts, currentMonthOrders, lastMonthOrders] =
+  const [totalUsers, totalProducts, currentPeriodOrders, previousPeriodOrders] =
     await Promise.all([
       User.countDocuments({ userType: "user" }),
       Product.countDocuments({ published: true }),
       Order.find({
-        createdAt: { $gte: startOfMonth, $lte: now },
+        createdAt: { $gte: currentStart, $lte: currentEnd },
         orderStatus: { $ne: "cancelled" }, // Exclude cancelled orders
       }),
       Order.find({
-        createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+        createdAt: { $gte: previousStart, $lte: previousEnd },
         orderStatus: { $ne: "cancelled" }, // Exclude cancelled orders
       }),
     ]);
 
-  // Get order breakdown by status for current month
+  // Get order breakdown by status for current period
   const orderBreakdown = await Order.aggregate([
     {
       $match: {
-        createdAt: { $gte: startOfMonth, $lte: now },
+        createdAt: { $gte: currentStart, $lte: currentEnd },
       },
     },
     {
@@ -61,25 +148,25 @@ const getDashboardStats = async () => {
   });
 
   // Calculate revenue using actual amount paid (handles partial payments correctly)
-  const currentMonthRevenue = currentMonthOrders.reduce(
+  const currentPeriodRevenue = currentPeriodOrders.reduce(
     (sum, order) => sum + (order.amountPaid || 0),
     0,
   );
-  const lastMonthRevenue = lastMonthOrders.reduce(
+  const previousPeriodRevenue = previousPeriodOrders.reduce(
     (sum, order) => sum + (order.amountPaid || 0),
     0,
   );
 
-  const currentMonthOrderIds = currentMonthOrders.map((order) => order._id);
-  const currentMonthOrderItems = await OrderItem.find({
-    order: { $in: currentMonthOrderIds },
+  const currentPeriodOrderIds = currentPeriodOrders.map((order) => order._id);
+  const currentPeriodOrderItems = await OrderItem.find({
+    order: { $in: currentPeriodOrderIds },
   }).populate("product");
 
   let totalCost = 0; // Total buying cost
   let itemsWithoutBuyingPrice = 0;
 
   // Calculate total buying cost for all items
-  for (const item of currentMonthOrderItems) {
+  for (const item of currentPeriodOrderItems) {
     let product = item.product as any;
 
     // Fallback: If product is null (deleted?), try to find by name
@@ -101,17 +188,17 @@ const getDashboardStats = async () => {
   }
 
   // Profit = Actual Revenue (after discounts) - Total Cost
-  // Revenue is currentMonthRevenue which already accounts for discounts
-  const totalProfit = currentMonthRevenue - totalCost;
+  // Revenue is currentPeriodRevenue which already accounts for discounts
+  const totalProfit = currentPeriodRevenue - totalCost;
 
-  // Calculate Last Month Profit for growth comparison
-  const lastMonthOrderIds = lastMonthOrders.map((order) => order._id);
-  const lastMonthOrderItems = await OrderItem.find({
-    order: { $in: lastMonthOrderIds },
+  // Calculate Previous Period Profit for growth comparison
+  const previousPeriodOrderIds = previousPeriodOrders.map((order) => order._id);
+  const previousPeriodOrderItems = await OrderItem.find({
+    order: { $in: previousPeriodOrderIds },
   }).populate("product");
 
-  let lastMonthCost = 0;
-  for (const item of lastMonthOrderItems) {
+  let previousPeriodCost = 0;
+  for (const item of previousPeriodOrderItems) {
     let product = item.product as any;
 
     if (!product) {
@@ -120,66 +207,70 @@ const getDashboardStats = async () => {
 
     const buyingPrice = product?.buyingPrice || 0;
     const itemCost = buyingPrice * item.quantity;
-    lastMonthCost += itemCost;
+    previousPeriodCost += itemCost;
   }
 
-  const lastMonthProfit = lastMonthRevenue - lastMonthCost;
+  const previousPeriodProfit = previousPeriodRevenue - previousPeriodCost;
 
   const profitGrowth =
-    lastMonthProfit > 0
-      ? ((totalProfit - lastMonthProfit) / lastMonthProfit) * 100
+    previousPeriodProfit > 0
+      ? ((totalProfit - previousPeriodProfit) / previousPeriodProfit) * 100
       : 0;
 
   // Calculate growth percentages
   const revenueGrowth =
-    lastMonthRevenue > 0
-      ? ((currentMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100
-      : 0;
-
-  const ordersGrowth =
-    lastMonthOrders.length > 0
-      ? ((currentMonthOrders.length - lastMonthOrders.length) /
-          lastMonthOrders.length) *
+    previousPeriodRevenue > 0
+      ? ((currentPeriodRevenue - previousPeriodRevenue) /
+          previousPeriodRevenue) *
         100
       : 0;
 
-  // Get customer growth (users created this month vs last month)
-  const currentMonthUsers = await User.countDocuments({
+  const ordersGrowth =
+    previousPeriodOrders.length > 0
+      ? ((currentPeriodOrders.length - previousPeriodOrders.length) /
+          previousPeriodOrders.length) *
+        100
+      : 0;
+
+  // Get customer growth (users created in current period vs previous period)
+  const currentPeriodUsers = await User.countDocuments({
     userType: "user",
-    createdAt: { $gte: startOfMonth, $lte: now },
+    createdAt: { $gte: currentStart, $lte: currentEnd },
   });
 
-  const lastMonthUsers = await User.countDocuments({
+  const previousPeriodUsers = await User.countDocuments({
     userType: "user",
-    createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+    createdAt: { $gte: previousStart, $lte: previousEnd },
   });
 
   const customersGrowth =
-    lastMonthUsers > 0
-      ? ((currentMonthUsers - lastMonthUsers) / lastMonthUsers) * 100
+    previousPeriodUsers > 0
+      ? ((currentPeriodUsers - previousPeriodUsers) / previousPeriodUsers) * 100
       : 0;
 
   // Get product growth
-  const currentMonthProducts = await Product.countDocuments({
+  const currentPeriodProducts = await Product.countDocuments({
     isActive: true,
-    createdAt: { $gte: startOfMonth, $lte: now },
+    createdAt: { $gte: currentStart, $lte: currentEnd },
   });
 
-  const lastMonthProducts = await Product.countDocuments({
+  const previousPeriodProducts = await Product.countDocuments({
     isActive: true,
-    createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+    createdAt: { $gte: previousStart, $lte: previousEnd },
   });
 
   const productsGrowth =
-    lastMonthProducts > 0
-      ? ((currentMonthProducts - lastMonthProducts) / lastMonthProducts) * 100
+    previousPeriodProducts > 0
+      ? ((currentPeriodProducts - previousPeriodProducts) /
+          previousPeriodProducts) *
+        100
       : 0;
 
   return {
-    totalRevenue: currentMonthRevenue,
+    totalRevenue: currentPeriodRevenue,
     totalProfit: totalProfit,
     profitGrowth: Math.round(profitGrowth * 100) / 100,
-    totalOrders: currentMonthOrders.length,
+    totalOrders: currentPeriodOrders.length,
     totalCustomers: totalUsers,
     totalProducts: totalProducts,
     revenueGrowth: Math.round(revenueGrowth * 100) / 100,

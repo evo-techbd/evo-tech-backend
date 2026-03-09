@@ -9,7 +9,8 @@ const sendResponse_1 = __importDefault(require("../../utils/sendResponse"));
 const catchAsync_1 = require("../../utils/catchAsync");
 const dashboard_service_1 = require("./dashboard.service");
 const getDashboardStats = (0, catchAsync_1.catchAsync)(async (req, res) => {
-    const result = await dashboard_service_1.DashboardServices.getDashboardStats();
+    const { range } = req.query;
+    const result = await dashboard_service_1.DashboardServices.getDashboardStats(range);
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.OK,
         success: true,

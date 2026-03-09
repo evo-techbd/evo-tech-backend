@@ -25,6 +25,7 @@ import { PageContentRoutes } from "../modules/page-content/page-content.route";
 import { FaqRoutes } from "../modules/faq/faq.route";
 import { PickupPointRoutes } from "../modules/pickuppoint/pickuppoint.route";
 import { TrashRoutes } from "../modules/trash/trash.route";
+import { PrintingSaleRoutes } from "../modules/printing-sale/printing-sale.route";
 
 const router = express.Router();
 const adminRouter = express.Router();
@@ -43,6 +44,7 @@ adminRouter.use("/pickup-points", PickupPointRoutes);
   adminRouter.use("/trash", TrashRoutes);
 adminRouter.use("/dashboard", DashboardRoutes);
 adminRouter.use("/finance", FinanceRoutes);
+adminRouter.use("/printing-sales", PrintingSaleRoutes);
 
 const moduleRoutes = [
   {

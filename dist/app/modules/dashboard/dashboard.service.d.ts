@@ -1,5 +1,6 @@
+type DateRange = "today" | "this-week" | "this-month" | "all-time";
 export declare const DashboardServices: {
-    getDashboardStats: () => Promise<{
+    getDashboardStats: (range?: DateRange) => Promise<{
         totalRevenue: number;
         totalProfit: number;
         profitGrowth: number;
@@ -11,12 +12,24 @@ export declare const DashboardServices: {
         customersGrowth: number;
         productsGrowth: number;
         orderBreakdown: Record<string, number>;
+        revenueBreakdown: {
+            orderRevenue: number;
+            printingRevenue: number;
+            orderCount: number;
+            printingSalesCount: number;
+        };
         profitWarning: {
             message: string;
             itemsAffected: number;
         } | null;
     }>;
-    getSalesData: (period?: string) => Promise<any[]>;
+    getSalesData: (period?: string) => Promise<{
+        date: string;
+        sales: number;
+        orders: number;
+        orderSales: number;
+        printingSales: number;
+    }[]>;
     getRecentOrders: (limit?: number) => Promise<{
         id: string;
         orderNumber: string;
@@ -39,27 +52,27 @@ export declare const DashboardServices: {
     }[]>;
     getEarningsReport: () => Promise<{
         total: {
-            earnings: number;
+            earnings: any;
             orders: number;
         };
         yearly: {
-            earnings: number;
+            earnings: any;
             orders: number;
             growth: number;
             breakdown: {
-                year: any;
-                earnings: any;
-                orders: any;
+                [x: string]: number;
+                earnings: number;
+                orders: number;
             }[];
         };
         monthly: {
-            earnings: number;
+            earnings: any;
             orders: number;
             growth: number;
             breakdown: {
-                month: any;
-                earnings: any;
-                orders: any;
+                [x: string]: number;
+                earnings: number;
+                orders: number;
             }[];
         };
         avgOrderValue: number;
@@ -68,4 +81,5 @@ export declare const DashboardServices: {
         count: number;
     }>;
 };
+export {};
 //# sourceMappingURL=dashboard.service.d.ts.map

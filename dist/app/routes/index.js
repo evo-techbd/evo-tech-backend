@@ -30,6 +30,7 @@ const page_content_route_1 = require("../modules/page-content/page-content.route
 const faq_route_1 = require("../modules/faq/faq.route");
 const pickuppoint_route_1 = require("../modules/pickuppoint/pickuppoint.route");
 const trash_route_1 = require("../modules/trash/trash.route");
+const printing_sale_route_1 = require("../modules/printing-sale/printing-sale.route");
 const router = express_1.default.Router();
 const adminRouter = express_1.default.Router();
 // Admin prefix aliases to match frontend expectations
@@ -46,6 +47,7 @@ adminRouter.use("/pickup-points", pickuppoint_route_1.PickupPointRoutes);
 adminRouter.use("/trash", trash_route_1.TrashRoutes);
 adminRouter.use("/dashboard", dashboard_route_1.DashboardRoutes);
 adminRouter.use("/finance", finance_route_1.FinanceRoutes);
+adminRouter.use("/printing-sales", printing_sale_route_1.PrintingSaleRoutes);
 const moduleRoutes = [
     {
         path: "/auth",

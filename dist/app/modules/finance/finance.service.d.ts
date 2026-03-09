@@ -23,16 +23,18 @@ export declare const FinanceServices: {
         totalWithdraw: number;
         totalExpense: number;
         totalSalesProfit: any;
+        printingSalesProfit: any;
+        orderSalesProfit: any;
         currentBalance: number;
     }>;
     getSalesProfitTransactionsFromDB: (query: Record<string, unknown>) => Promise<{
         meta: {
             page: number;
             limit: number;
-            total: any;
+            total: number;
             totalPages: number;
         };
-        result: any;
+        result: any[];
     }>;
 };
 //# sourceMappingURL=finance.service.d.ts.map

@@ -78,7 +78,7 @@ export declare const CategoryServices: {
         updatedAt?: Date;
         __v: number;
     }>;
-    deleteCategoryFromDB: (id: string) => Promise<(import("mongoose").Document<unknown, {}, TCategory, {}, {}> & TCategory & Required<{
+    deleteCategoryFromDB: (id: string, deletedBy?: string) => Promise<(import("mongoose").Document<unknown, {}, TCategory, {}, {}> & TCategory & Required<{
         _id: string;
     }> & {
         __v: number;

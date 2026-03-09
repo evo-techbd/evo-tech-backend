@@ -7,6 +7,7 @@ exports.CategoryServices = void 0;
 const category_model_1 = require("./category.model");
 const AppError_1 = __importDefault(require("../../errors/AppError"));
 const http_status_1 = __importDefault(require("http-status"));
+const trash_model_1 = require("../trash/trash.model");
 const slugify_1 = require("../../utils/slugify");
 const cloudinaryUpload_1 = require("../../utils/cloudinaryUpload");
 const subcategory_model_1 = require("../subcategory/subcategory.model");
@@ -123,11 +124,19 @@ const updateCategoryIntoDB = async (id, payload, imageBuffer) => {
         brands_count: 0,
     };
 };
-const deleteCategoryFromDB = async (id) => {
+const deleteCategoryFromDB = async (id, deletedBy) => {
     const category = await category_model_1.Category.findById(id);
     if (!category) {
         throw new AppError_1.default(http_status_1.default.NOT_FOUND, "Category not found");
     }
+    // Move to trash before deleting
+    await trash_model_1.TrashItem.create({
+        entityType: "category",
+        originalId: id,
+        entityLabel: category.name,
+        data: category.toObject(),
+        deletedBy: deletedBy || undefined,
+    });
     const result = await category_model_1.Category.findByIdAndDelete(id);
     return result;
 };

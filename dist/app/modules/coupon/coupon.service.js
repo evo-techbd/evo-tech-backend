@@ -7,6 +7,7 @@ exports.CouponService = void 0;
 const coupon_model_1 = require("./coupon.model");
 const AppError_1 = __importDefault(require("../../errors/AppError"));
 const http_status_1 = __importDefault(require("http-status"));
+const trash_model_1 = require("../trash/trash.model");
 // Create new coupon
 const createCoupon = async (couponData) => {
     // Check if coupon code already exists
@@ -179,11 +180,23 @@ const updateCoupon = async (id, updateData) => {
     return coupon;
 };
 // Delete coupon
-const deleteCoupon = async (id) => {
-    const coupon = await coupon_model_1.Coupon.findByIdAndDelete(id);
+const deleteCoupon = async (id, deletedBy) => {
+    const coupon = await coupon_model_1.Coupon.findById(id);
     if (!coupon) {
         throw new AppError_1.default(http_status_1.default.NOT_FOUND, "Coupon not found");
     }
+    // Fetch usage records so we can save them with the trash item
+    const usageRecords = await coupon_model_1.CouponUsage.find({ couponId: id }).lean();
+    // Move to trash before deleting
+    await trash_model_1.TrashItem.create({
+        entityType: "coupon",
+        originalId: id,
+        entityLabel: coupon.code,
+        data: coupon.toObject(),
+        relatedData: { usageRecords },
+        deletedBy: deletedBy || undefined,
+    });
+    await coupon_model_1.Coupon.findByIdAndDelete(id);
     // Also delete usage records
     await coupon_model_1.CouponUsage.deleteMany({ couponId: id });
 };

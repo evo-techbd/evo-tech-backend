@@ -7,6 +7,7 @@ exports.SubcategoryServices = void 0;
 const subcategory_model_1 = require("./subcategory.model");
 const AppError_1 = __importDefault(require("../../errors/AppError"));
 const http_status_1 = __importDefault(require("http-status"));
+const trash_model_1 = require("../trash/trash.model");
 const slugify_1 = require("../../utils/slugify");
 const cloudinaryUpload_1 = require("../../utils/cloudinaryUpload");
 const getAllSubcategoriesFromDB = async (query) => {
@@ -79,11 +80,19 @@ const updateSubcategoryIntoDB = async (id, payload, imageBuffer) => {
     }).populate("category");
     return result;
 };
-const deleteSubcategoryFromDB = async (id) => {
+const deleteSubcategoryFromDB = async (id, deletedBy) => {
     const subcategory = await subcategory_model_1.Subcategory.findById(id);
     if (!subcategory) {
         throw new AppError_1.default(http_status_1.default.NOT_FOUND, "Subcategory not found");
     }
+    // Move to trash before deleting
+    await trash_model_1.TrashItem.create({
+        entityType: "subcategory",
+        originalId: id,
+        entityLabel: subcategory.name,
+        data: subcategory.toObject(),
+        deletedBy: deletedBy || undefined,
+    });
     const result = await subcategory_model_1.Subcategory.findByIdAndDelete(id);
     return result;
 };

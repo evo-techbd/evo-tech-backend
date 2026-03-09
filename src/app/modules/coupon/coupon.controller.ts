@@ -93,7 +93,7 @@ const updateCoupon = catchAsync(async (req: Request, res: Response) => {
 // Delete coupon
 const deleteCoupon = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  await CouponService.deleteCoupon(id);
+  await CouponService.deleteCoupon(id, req.user?._id);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,

@@ -60,13 +60,13 @@ const getDashboardStats = async () => {
     }
   });
 
-  // Calculate revenue (excluding cancelled orders)
+  // Calculate revenue using actual amount paid (handles partial payments correctly)
   const currentMonthRevenue = currentMonthOrders.reduce(
-    (sum, order) => sum + (order.totalPayable || 0),
+    (sum, order) => sum + (order.amountPaid || 0),
     0,
   );
   const lastMonthRevenue = lastMonthOrders.reduce(
-    (sum, order) => sum + (order.totalPayable || 0),
+    (sum, order) => sum + (order.amountPaid || 0),
     0,
   );
 
@@ -231,7 +231,7 @@ const getSalesData = async (period: string = "30d") => {
         },
         sales: {
           $sum: {
-            $ifNull: ["$totalPayable", 0],
+            $ifNull: ["$amountPaid", 0],
           },
         },
         orders: { $sum: 1 },
@@ -320,7 +320,7 @@ const getEarningsReport = async () => {
   // Get all time earnings
   const allOrders = await Order.find({ orderStatus: { $ne: "cancelled" } });
   const totalEarnings = allOrders.reduce(
-    (sum, order) => sum + (order.totalPayable || 0),
+    (sum, order) => sum + (order.amountPaid || 0),
     0,
   );
 
@@ -331,7 +331,7 @@ const getEarningsReport = async () => {
     orderStatus: { $ne: "cancelled" },
   });
   const yearlyEarnings = yearOrders.reduce(
-    (sum, order) => sum + (order.totalPayable || 0),
+    (sum, order) => sum + (order.amountPaid || 0),
     0,
   );
 
@@ -342,7 +342,7 @@ const getEarningsReport = async () => {
     orderStatus: { $ne: "cancelled" },
   });
   const monthlyEarnings = monthOrders.reduce(
-    (sum, order) => sum + (order.totalPayable || 0),
+    (sum, order) => sum + (order.amountPaid || 0),
     0,
   );
 
@@ -354,7 +354,7 @@ const getEarningsReport = async () => {
     orderStatus: { $ne: "cancelled" },
   });
   const lastMonthEarnings = lastMonthOrders.reduce(
-    (sum, order) => sum + (order.totalPayable || 0),
+    (sum, order) => sum + (order.amountPaid || 0),
     0,
   );
 
@@ -366,7 +366,7 @@ const getEarningsReport = async () => {
     orderStatus: { $ne: "cancelled" },
   });
   const lastYearEarnings = lastYearOrders.reduce(
-    (sum, order) => sum + (order.totalPayable || 0),
+    (sum, order) => sum + (order.amountPaid || 0),
     0,
   );
 
@@ -392,7 +392,7 @@ const getEarningsReport = async () => {
     {
       $group: {
         _id: { $month: "$createdAt" },
-        earnings: { $sum: "$totalPayable" },
+        earnings: { $sum: "$amountPaid" },
         orders: { $sum: 1 },
       },
     },
@@ -413,7 +413,7 @@ const getEarningsReport = async () => {
     {
       $group: {
         _id: { $year: "$createdAt" },
-        earnings: { $sum: "$totalPayable" },
+        earnings: { $sum: "$amountPaid" },
         orders: { $sum: 1 },
       },
     },

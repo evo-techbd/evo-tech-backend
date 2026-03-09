@@ -43,7 +43,7 @@ const updateReview = (0, catchAsync_1.catchAsync)(async (req, res) => {
 });
 const deleteReview = (0, catchAsync_1.catchAsync)(async (req, res) => {
     const { reviewId } = req.params;
-    await review_service_1.ReviewServices.deleteReviewFromDB(reviewId);
+    await review_service_1.ReviewServices.deleteReviewFromDB(reviewId, req.user?._id);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_1.default.OK,

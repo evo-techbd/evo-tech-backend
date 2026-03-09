@@ -2,6 +2,7 @@ import { Subcategory } from "./subcategory.model";
 import { TSubcategory } from "./subcategory.interface";
 import AppError from "../../errors/AppError";
 import httpStatus from "http-status";
+import { TrashItem } from "../trash/trash.model";
 import { generateUniqueSlug } from "../../utils/slugify";
 import { uploadToCloudinary } from "../../utils/cloudinaryUpload";
 
@@ -99,11 +100,20 @@ const updateSubcategoryIntoDB = async (
   return result;
 };
 
-const deleteSubcategoryFromDB = async (id: string) => {
+const deleteSubcategoryFromDB = async (id: string, deletedBy?: string) => {
   const subcategory = await Subcategory.findById(id);
   if (!subcategory) {
     throw new AppError(httpStatus.NOT_FOUND, "Subcategory not found");
   }
+
+  // Move to trash before deleting
+  await TrashItem.create({
+    entityType: "subcategory",
+    originalId: id,
+    entityLabel: subcategory.name,
+    data: subcategory.toObject(),
+    deletedBy: deletedBy || undefined,
+  });
 
   const result = await Subcategory.findByIdAndDelete(id);
   return result;

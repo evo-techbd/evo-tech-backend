@@ -211,8 +211,22 @@ const handleBkashCallback = catchAsync(async (req: Request, res: Response) => {
       `${config.frontend_url}/order/${order?.orderNumber}?status=success`
     );
   } else if (status === "failure") {
+    // Mark the associated order's payment as failed
+    if (paymentID) {
+      await Order.findOneAndUpdate(
+        { bkashPaymentID: paymentID },
+        { paymentStatus: "failed" }
+      );
+    }
     res.redirect(`${config.frontend_url}/checkout?status=failure`);
   } else if (status === "cancel") {
+    // Mark the associated order's payment as failed (user cancelled payment)
+    if (paymentID) {
+      await Order.findOneAndUpdate(
+        { bkashPaymentID: paymentID },
+        { paymentStatus: "failed" }
+      );
+    }
     res.redirect(`${config.frontend_url}/checkout?status=cancel`);
   } else {
     res.redirect(`${config.frontend_url}/checkout?status=error`);

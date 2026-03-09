@@ -53,7 +53,7 @@ const updateReview = catchAsync(async (req, res) => {
 
 const deleteReview = catchAsync(async (req, res) => {
   const { reviewId } = req.params;
-  await ReviewServices.deleteReviewFromDB(reviewId);
+  await ReviewServices.deleteReviewFromDB(reviewId, req.user?._id);
 
   sendResponse(res, {
     success: true,

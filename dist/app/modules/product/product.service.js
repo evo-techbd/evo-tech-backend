@@ -7,6 +7,7 @@ exports.ProductServices = void 0;
 const product_model_1 = require("./product.model");
 const AppError_1 = __importDefault(require("../../errors/AppError"));
 const http_status_1 = __importDefault(require("http-status"));
+const trash_model_1 = require("../trash/trash.model");
 const slugify_1 = require("../../utils/slugify");
 const cloudinaryUpload_1 = require("../../utils/cloudinaryUpload");
 const brand_model_1 = require("../brand/brand.model");
@@ -498,11 +499,28 @@ const updateProductIntoDB = async (id, payload, mainImageBuffer, additionalImage
     }
     return result;
 };
-const deleteProductFromDB = async (id) => {
+const deleteProductFromDB = async (id, deletedBy) => {
     const product = await product_model_1.Product.findById(id);
     if (!product) {
         throw new AppError_1.default(http_status_1.default.NOT_FOUND, "Product not found");
     }
+    // Collect all related data before deleting so it can be restored later
+    const [images, specs, featureHeaders, featureSubsections, colorVariations] = await Promise.all([
+        product_model_1.ProductImage.find({ product: id }).lean(),
+        product_model_1.Specification.find({ product: id }).lean(),
+        product_model_1.FeaturesSectionHeader.find({ product: id }).lean(),
+        product_model_1.FeaturesSectionSubsection.find({ product: id }).lean(),
+        product_model_1.ProductColorVariation.find({ product: id }).lean(),
+    ]);
+    // Move to trash before deleting
+    await trash_model_1.TrashItem.create({
+        entityType: "product",
+        originalId: id,
+        entityLabel: product.name,
+        data: product.toObject(),
+        relatedData: { images, specs, featureHeaders, featureSubsections, colorVariations },
+        deletedBy: deletedBy || undefined,
+    });
     // Remove product from its landing section if assigned
     if (product.landingpageSectionId) {
         await landingsection_model_1.LandingSection.findByIdAndUpdate(product.landingpageSectionId, {

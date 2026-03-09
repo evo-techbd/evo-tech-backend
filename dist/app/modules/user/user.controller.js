@@ -57,7 +57,8 @@ const updateUser = (0, catchAsync_1.catchAsync)(async (req, res) => {
 });
 const deleteUser = (0, catchAsync_1.catchAsync)(async (req, res) => {
     const { id } = req.params;
-    await user_service_1.UserServices.deleteUserFromDB(id);
+    const deletedBy = req.user?.id;
+    await user_service_1.UserServices.deleteUserFromDB(id, deletedBy);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_1.default.OK,

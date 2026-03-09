@@ -5,6 +5,7 @@ import { Order } from "../order/order.model";
 import AppError from "../../errors/AppError";
 import httpStatus from "http-status";
 import { uploadToCloudinary } from "../../utils/cloudinaryUpload";
+import { TrashItem } from "../trash/trash.model";
 
 const getReviewsByProductFromDB = async (productId: string) => {
   const reviews = await Review.find({ product: productId }).sort({
@@ -111,11 +112,22 @@ const updateReviewIntoDB = async (
   return review;
 };
 
-const deleteReviewFromDB = async (reviewId: string) => {
-  const review = await Review.findByIdAndDelete(reviewId);
+const deleteReviewFromDB = async (reviewId: string, deletedBy?: string) => {
+  const review = await Review.findById(reviewId);
   if (!review) {
     throw new AppError(httpStatus.NOT_FOUND, "Review not found");
   }
+
+  // Move to trash before deleting
+  await TrashItem.create({
+    entityType: "review",
+    originalId: reviewId,
+    entityLabel: `Review by ${review.userName} (${review.rating}★)`,
+    data: review.toObject(),
+    deletedBy: deletedBy || undefined,
+  });
+
+  await Review.findByIdAndDelete(reviewId);
 
   // Update product rating
   const reviews = await Review.find({ product: review.product });

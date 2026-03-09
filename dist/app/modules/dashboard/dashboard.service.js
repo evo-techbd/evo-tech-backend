@@ -52,9 +52,9 @@ const getDashboardStats = async () => {
             breakdown[item._id] = item.count;
         }
     });
-    // Calculate revenue (excluding cancelled orders)
-    const currentMonthRevenue = currentMonthOrders.reduce((sum, order) => sum + (order.totalPayable || 0), 0);
-    const lastMonthRevenue = lastMonthOrders.reduce((sum, order) => sum + (order.totalPayable || 0), 0);
+    // Calculate revenue using actual amount paid (handles partial payments correctly)
+    const currentMonthRevenue = currentMonthOrders.reduce((sum, order) => sum + (order.amountPaid || 0), 0);
+    const lastMonthRevenue = lastMonthOrders.reduce((sum, order) => sum + (order.amountPaid || 0), 0);
     const currentMonthOrderIds = currentMonthOrders.map((order) => order._id);
     const currentMonthOrderItems = await order_model_1.OrderItem.find({
         order: { $in: currentMonthOrderIds },
@@ -186,7 +186,7 @@ const getSalesData = async (period = "30d") => {
                 },
                 sales: {
                     $sum: {
-                        $ifNull: ["$totalPayable", 0],
+                        $ifNull: ["$amountPaid", 0],
                     },
                 },
                 orders: { $sum: 1 },
@@ -266,21 +266,21 @@ const getEarningsReport = async () => {
     const now = new Date();
     // Get all time earnings
     const allOrders = await order_model_1.Order.find({ orderStatus: { $ne: "cancelled" } });
-    const totalEarnings = allOrders.reduce((sum, order) => sum + (order.totalPayable || 0), 0);
+    const totalEarnings = allOrders.reduce((sum, order) => sum + (order.amountPaid || 0), 0);
     // Get current year earnings
     const startOfYear = new Date(now.getFullYear(), 0, 1);
     const yearOrders = await order_model_1.Order.find({
         createdAt: { $gte: startOfYear, $lte: now },
         orderStatus: { $ne: "cancelled" },
     });
-    const yearlyEarnings = yearOrders.reduce((sum, order) => sum + (order.totalPayable || 0), 0);
+    const yearlyEarnings = yearOrders.reduce((sum, order) => sum + (order.amountPaid || 0), 0);
     // Get current month earnings
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthOrders = await order_model_1.Order.find({
         createdAt: { $gte: startOfMonth, $lte: now },
         orderStatus: { $ne: "cancelled" },
     });
-    const monthlyEarnings = monthOrders.reduce((sum, order) => sum + (order.totalPayable || 0), 0);
+    const monthlyEarnings = monthOrders.reduce((sum, order) => sum + (order.amountPaid || 0), 0);
     // Get last month for comparison
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
@@ -288,7 +288,7 @@ const getEarningsReport = async () => {
         createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
         orderStatus: { $ne: "cancelled" },
     });
-    const lastMonthEarnings = lastMonthOrders.reduce((sum, order) => sum + (order.totalPayable || 0), 0);
+    const lastMonthEarnings = lastMonthOrders.reduce((sum, order) => sum + (order.amountPaid || 0), 0);
     // Get last year for comparison
     const startOfLastYear = new Date(now.getFullYear() - 1, 0, 1);
     const endOfLastYear = new Date(now.getFullYear() - 1, 11, 31);
@@ -296,7 +296,7 @@ const getEarningsReport = async () => {
         createdAt: { $gte: startOfLastYear, $lte: endOfLastYear },
         orderStatus: { $ne: "cancelled" },
     });
-    const lastYearEarnings = lastYearOrders.reduce((sum, order) => sum + (order.totalPayable || 0), 0);
+    const lastYearEarnings = lastYearOrders.reduce((sum, order) => sum + (order.amountPaid || 0), 0);
     // Calculate growth
     const monthlyGrowth = lastMonthEarnings > 0
         ? ((monthlyEarnings - lastMonthEarnings) / lastMonthEarnings) * 100
@@ -315,7 +315,7 @@ const getEarningsReport = async () => {
         {
             $group: {
                 _id: { $month: "$createdAt" },
-                earnings: { $sum: "$totalPayable" },
+                earnings: { $sum: "$amountPaid" },
                 orders: { $sum: 1 },
             },
         },
@@ -335,7 +335,7 @@ const getEarningsReport = async () => {
         {
             $group: {
                 _id: { $year: "$createdAt" },
-                earnings: { $sum: "$totalPayable" },
+                earnings: { $sum: "$amountPaid" },
                 orders: { $sum: 1 },
             },
         },

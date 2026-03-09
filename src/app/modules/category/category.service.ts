@@ -2,6 +2,7 @@ import { Category } from "./category.model";
 import { TCategory } from "./category.interface";
 import AppError from "../../errors/AppError";
 import httpStatus from "http-status";
+import { TrashItem } from "../trash/trash.model";
 import { generateUniqueSlug } from "../../utils/slugify";
 import {
   uploadToCloudinary,
@@ -162,11 +163,20 @@ const updateCategoryIntoDB = async (
   };
 };
 
-const deleteCategoryFromDB = async (id: string) => {
+const deleteCategoryFromDB = async (id: string, deletedBy?: string) => {
   const category = await Category.findById(id);
   if (!category) {
     throw new AppError(httpStatus.NOT_FOUND, "Category not found");
   }
+
+  // Move to trash before deleting
+  await TrashItem.create({
+    entityType: "category",
+    originalId: id,
+    entityLabel: category.name,
+    data: category.toObject(),
+    deletedBy: deletedBy || undefined,
+  });
 
   const result = await Category.findByIdAndDelete(id);
   return result;

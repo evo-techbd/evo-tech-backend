@@ -128,7 +128,7 @@ const updateProduct = catchAsync(async (req, res) => {
 
 const deleteProduct = catchAsync(async (req, res) => {
   const { id } = req.params;
-  await ProductServices.deleteProductFromDB(id);
+  await ProductServices.deleteProductFromDB(id, req.user?._id);
 
   sendResponse(res, {
     success: true,

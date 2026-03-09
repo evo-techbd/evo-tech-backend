@@ -44,7 +44,7 @@ export declare const BrandServices: {
     }> & {
         __v: number;
     }) | null>;
-    deleteBrandFromDB: (id: string) => Promise<(import("mongoose").Document<unknown, {}, TBrand, {}, {}> & TBrand & Required<{
+    deleteBrandFromDB: (id: string, deletedBy?: string) => Promise<(import("mongoose").Document<unknown, {}, TBrand, {}, {}> & TBrand & Required<{
         _id: string;
     }> & {
         __v: number;

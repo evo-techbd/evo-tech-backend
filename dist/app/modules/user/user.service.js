@@ -4,6 +4,7 @@ exports.UserServices = void 0;
 const user_model_1 = require("./user.model");
 const order_model_1 = require("../order/order.model");
 const order_service_1 = require("../order/order.service");
+const trash_model_1 = require("../trash/trash.model");
 const getAllUsersFromDB = async (query) => {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 10;
@@ -65,7 +66,18 @@ const updateUserIntoDB = async (payload, id) => {
     // console.log('✅ User updated:', result);
     return result;
 };
-const deleteUserFromDB = async (id) => {
+const deleteUserFromDB = async (id, deletedBy) => {
+    const user = await user_model_1.User.findById(id);
+    if (!user)
+        return null;
+    // Move to trash before deleting
+    await trash_model_1.TrashItem.create({
+        entityType: "user",
+        originalId: id,
+        entityLabel: `${user.firstName} ${user.lastName} (${user.email})`,
+        data: user.toObject(),
+        deletedBy: deletedBy || undefined,
+    });
     const result = await user_model_1.User.findByIdAndDelete(id);
     return result;
 };

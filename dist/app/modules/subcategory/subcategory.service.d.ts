@@ -33,7 +33,7 @@ export declare const SubcategoryServices: {
     }> & {
         __v: number;
     }) | null>;
-    deleteSubcategoryFromDB: (id: string) => Promise<(import("mongoose").Document<unknown, {}, TSubcategory, {}, {}> & TSubcategory & Required<{
+    deleteSubcategoryFromDB: (id: string, deletedBy?: string) => Promise<(import("mongoose").Document<unknown, {}, TSubcategory, {}, {}> & TSubcategory & Required<{
         _id: string;
     }> & {
         __v: number;

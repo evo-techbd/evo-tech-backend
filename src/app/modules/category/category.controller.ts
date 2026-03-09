@@ -77,7 +77,7 @@ const updateCategory = catchAsync(async (req, res) => {
 
 const deleteCategory = catchAsync(async (req, res) => {
   const { id } = req.params;
-  await CategoryServices.deleteCategoryFromDB(id);
+  await CategoryServices.deleteCategoryFromDB(id, req.user?._id);
 
   sendResponse(res, {
     success: true,

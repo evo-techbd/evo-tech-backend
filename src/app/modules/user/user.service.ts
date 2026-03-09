@@ -2,6 +2,7 @@ import { TUser } from "./user.interface";
 import { User } from "./user.model";
 import { Order } from "../order/order.model";
 import { OrderServices } from "../order/order.service";
+import { TrashItem } from "../trash/trash.model";
 
 const getAllUsersFromDB = async (query: Record<string, unknown>) => {
   const page = Number(query.page) || 1;
@@ -76,7 +77,19 @@ const updateUserIntoDB = async (payload: Partial<TUser>, id: string) => {
   return result;
 };
 
-const deleteUserFromDB = async (id: string) => {
+const deleteUserFromDB = async (id: string, deletedBy?: string) => {
+  const user = await User.findById(id);
+  if (!user) return null;
+
+  // Move to trash before deleting
+  await TrashItem.create({
+    entityType: "user",
+    originalId: id,
+    entityLabel: `${user.firstName} ${user.lastName} (${user.email})`,
+    data: user.toObject(),
+    deletedBy: deletedBy || undefined,
+  });
+
   const result = await User.findByIdAndDelete(id);
   return result;
 };

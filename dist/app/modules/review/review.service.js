@@ -11,6 +11,7 @@ const order_model_1 = require("../order/order.model");
 const AppError_1 = __importDefault(require("../../errors/AppError"));
 const http_status_1 = __importDefault(require("http-status"));
 const cloudinaryUpload_1 = require("../../utils/cloudinaryUpload");
+const trash_model_1 = require("../trash/trash.model");
 const getReviewsByProductFromDB = async (productId) => {
     const reviews = await review_model_1.Review.find({ product: productId }).sort({
         createdAt: -1,
@@ -88,11 +89,20 @@ const updateReviewIntoDB = async (reviewId, payload, imageBuffer) => {
     });
     return review;
 };
-const deleteReviewFromDB = async (reviewId) => {
-    const review = await review_model_1.Review.findByIdAndDelete(reviewId);
+const deleteReviewFromDB = async (reviewId, deletedBy) => {
+    const review = await review_model_1.Review.findById(reviewId);
     if (!review) {
         throw new AppError_1.default(http_status_1.default.NOT_FOUND, "Review not found");
     }
+    // Move to trash before deleting
+    await trash_model_1.TrashItem.create({
+        entityType: "review",
+        originalId: reviewId,
+        entityLabel: `Review by ${review.userName} (${review.rating}★)`,
+        data: review.toObject(),
+        deletedBy: deletedBy || undefined,
+    });
+    await review_model_1.Review.findByIdAndDelete(reviewId);
     // Update product rating
     const reviews = await review_model_1.Review.find({ product: review.product });
     const averageRating = reviews.length > 0

@@ -28,7 +28,7 @@ export declare const UserServices: {
     }> & {
         __v: number;
     }) | null>;
-    deleteUserFromDB: (id: string) => Promise<(import("mongoose").Document<unknown, {}, TUser, {}, {}> & TUser & Required<{
+    deleteUserFromDB: (id: string, deletedBy?: string) => Promise<(import("mongoose").Document<unknown, {}, TUser, {}, {}> & TUser & Required<{
         _id: string;
     }> & {
         __v: number;

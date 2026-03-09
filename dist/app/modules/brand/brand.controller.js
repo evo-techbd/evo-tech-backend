@@ -59,7 +59,7 @@ const updateBrand = (0, catchAsync_1.catchAsync)(async (req, res) => {
 });
 const deleteBrand = (0, catchAsync_1.catchAsync)(async (req, res) => {
     const { id } = req.params;
-    await brand_service_1.BrandServices.deleteBrandFromDB(id);
+    await brand_service_1.BrandServices.deleteBrandFromDB(id, req.user?._id);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_1.default.OK,

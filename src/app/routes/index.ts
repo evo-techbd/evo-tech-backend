@@ -24,6 +24,7 @@ import { TaxonomyRoutes } from "../modules/taxonomy/taxonomy.route";
 import { PageContentRoutes } from "../modules/page-content/page-content.route";
 import { FaqRoutes } from "../modules/faq/faq.route";
 import { PickupPointRoutes } from "../modules/pickuppoint/pickuppoint.route";
+import { TrashRoutes } from "../modules/trash/trash.route";
 
 const router = express.Router();
 const adminRouter = express.Router();
@@ -39,6 +40,7 @@ adminRouter.use("/users", UserRoutes);
 adminRouter.use("/banners", BannerRoutes);
 adminRouter.use("/coupons", CouponRoutes);
 adminRouter.use("/pickup-points", PickupPointRoutes);
+  adminRouter.use("/trash", TrashRoutes);
 adminRouter.use("/dashboard", DashboardRoutes);
 adminRouter.use("/finance", FinanceRoutes);
 
@@ -138,6 +140,10 @@ const moduleRoutes = [
   {
     path: "/pickup-points",
     route: PickupPointRoutes,
+  },
+  {
+    path: "/trash",
+    route: TrashRoutes,
   },
   {
     path: "/admin",

@@ -25,7 +25,7 @@ export declare const CouponService: {
         message: string;
     }>;
     updateCoupon: (id: string, updateData: Partial<ICoupon>) => Promise<ICoupon | null>;
-    deleteCoupon: (id: string) => Promise<void>;
+    deleteCoupon: (id: string, deletedBy?: string) => Promise<void>;
     getCouponStats: (id: string) => Promise<{
         coupon: import("mongoose").Document<unknown, {}, ICoupon, {}, {}> & ICoupon & Required<{
             _id: string;

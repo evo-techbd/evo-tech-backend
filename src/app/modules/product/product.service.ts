@@ -9,6 +9,7 @@ import {
 import { TProduct } from "./product.interface";
 import AppError from "../../errors/AppError";
 import httpStatus from "http-status";
+import { TrashItem } from "../trash/trash.model";
 import { generateUniqueSlug } from "../../utils/slugify";
 import { uploadToCloudinary } from "../../utils/cloudinaryUpload";
 import { Brand } from "../brand/brand.model";
@@ -580,11 +581,30 @@ const updateProductIntoDB = async (
   return result;
 };
 
-const deleteProductFromDB = async (id: string) => {
+const deleteProductFromDB = async (id: string, deletedBy?: string) => {
   const product = await Product.findById(id);
   if (!product) {
     throw new AppError(httpStatus.NOT_FOUND, "Product not found");
   }
+
+  // Collect all related data before deleting so it can be restored later
+  const [images, specs, featureHeaders, featureSubsections, colorVariations] = await Promise.all([
+    ProductImage.find({ product: id }).lean(),
+    Specification.find({ product: id }).lean(),
+    FeaturesSectionHeader.find({ product: id }).lean(),
+    FeaturesSectionSubsection.find({ product: id }).lean(),
+    ProductColorVariation.find({ product: id }).lean(),
+  ]);
+
+  // Move to trash before deleting
+  await TrashItem.create({
+    entityType: "product",
+    originalId: id,
+    entityLabel: product.name,
+    data: product.toObject(),
+    relatedData: { images, specs, featureHeaders, featureSubsections, colorVariations },
+    deletedBy: deletedBy || undefined,
+  });
 
   // Remove product from its landing section if assigned
   if (product.landingpageSectionId) {

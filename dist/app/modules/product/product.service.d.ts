@@ -148,7 +148,7 @@ export declare const ProductServices: {
     }> & {
         __v: number;
     }) | null>;
-    deleteProductFromDB: (id: string) => Promise<(import("mongoose").Document<unknown, {}, TProduct, {}, {}> & TProduct & Required<{
+    deleteProductFromDB: (id: string, deletedBy?: string) => Promise<(import("mongoose").Document<unknown, {}, TProduct, {}, {}> & TProduct & Required<{
         _id: string;
     }> & {
         __v: number;

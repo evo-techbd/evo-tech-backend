@@ -106,7 +106,7 @@ const updateProduct = (0, catchAsync_1.catchAsync)(async (req, res) => {
 });
 const deleteProduct = (0, catchAsync_1.catchAsync)(async (req, res) => {
     const { id } = req.params;
-    await product_service_1.ProductServices.deleteProductFromDB(id);
+    await product_service_1.ProductServices.deleteProductFromDB(id, req.user?._id);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_1.default.OK,

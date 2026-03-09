@@ -59,7 +59,7 @@ const updateCategory = (0, catchAsync_1.catchAsync)(async (req, res) => {
 });
 const deleteCategory = (0, catchAsync_1.catchAsync)(async (req, res) => {
     const { id } = req.params;
-    await category_service_1.CategoryServices.deleteCategoryFromDB(id);
+    await category_service_1.CategoryServices.deleteCategoryFromDB(id, req.user?._id);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_1.default.OK,

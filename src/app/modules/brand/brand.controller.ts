@@ -68,7 +68,7 @@ const updateBrand = catchAsync(async (req, res) => {
 
 const deleteBrand = catchAsync(async (req, res) => {
   const { id } = req.params;
-  await BrandServices.deleteBrandFromDB(id);
+  await BrandServices.deleteBrandFromDB(id, req.user?._id);
 
   sendResponse(res, {
     success: true,

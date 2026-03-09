@@ -77,7 +77,7 @@ const updateSubcategory = catchAsync(async (req, res) => {
 
 const deleteSubcategory = catchAsync(async (req, res) => {
   const { id } = req.params;
-  await SubcategoryServices.deleteSubcategoryFromDB(id);
+  await SubcategoryServices.deleteSubcategoryFromDB(id, req.user?._id);
 
   sendResponse(res, {
     success: true,

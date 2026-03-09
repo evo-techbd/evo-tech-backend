@@ -62,7 +62,8 @@ const updateUser = catchAsync(async (req, res) => {
 
 const deleteUser = catchAsync(async (req, res) => {
   const { id } = req.params;
-  await UserServices.deleteUserFromDB(id);
+  const deletedBy = (req as any).user?.id;
+  await UserServices.deleteUserFromDB(id, deletedBy);
 
   sendResponse(res, {
     success: true,

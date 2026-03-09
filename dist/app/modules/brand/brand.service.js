@@ -7,6 +7,7 @@ exports.BrandServices = void 0;
 const brand_model_1 = require("./brand.model");
 const AppError_1 = __importDefault(require("../../errors/AppError"));
 const http_status_1 = __importDefault(require("http-status"));
+const trash_model_1 = require("../trash/trash.model");
 const slugify_1 = require("../../utils/slugify");
 const cloudinaryUpload_1 = require("../../utils/cloudinaryUpload");
 const getAllBrandsFromDB = async (query) => {
@@ -94,11 +95,19 @@ const updateBrandIntoDB = async (id, payload, logoBuffer) => {
         .populate("subcategories");
     return result;
 };
-const deleteBrandFromDB = async (id) => {
+const deleteBrandFromDB = async (id, deletedBy) => {
     const brand = await brand_model_1.Brand.findById(id);
     if (!brand) {
         throw new AppError_1.default(http_status_1.default.NOT_FOUND, "Brand not found");
     }
+    // Move to trash before deleting
+    await trash_model_1.TrashItem.create({
+        entityType: "brand",
+        originalId: id,
+        entityLabel: brand.name,
+        data: brand.toObject(),
+        deletedBy: deletedBy || undefined,
+    });
     const result = await brand_model_1.Brand.findByIdAndDelete(id);
     return result;
 };

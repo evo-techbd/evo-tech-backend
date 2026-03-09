@@ -384,6 +384,19 @@ const updateOrderStatusIntoDB = async (orderId, payload) => {
     if (payload.orderStatus === "delivered" && !order.deliveredAt) {
         payload.deliveredAt = new Date();
     }
+    // If order is being cancelled, auto-set payment status unless explicitly provided
+    if (payload.orderStatus === "cancelled" && payload.paymentStatus === undefined) {
+        if (order.paymentStatus === "paid") {
+            payload.paymentStatus = "refunded";
+        }
+        else if (order.paymentStatus === "partial") {
+            payload.paymentStatus = "refunded";
+        }
+        else {
+            // pending or anything else → payment never completed
+            payload.paymentStatus = "failed";
+        }
+    }
     // Calculate amountDue if amountPaid is provided
     if (payload.amountPaid !== undefined) {
         const totalPayable = payload.totalPayable || order.totalPayable;

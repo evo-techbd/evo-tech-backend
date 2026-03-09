@@ -2,6 +2,7 @@ import { Coupon, CouponUsage } from "./coupon.model";
 import { ICoupon } from "./coupon.interface";
 import AppError from "../../errors/AppError";
 import httpStatus from "http-status";
+import { TrashItem } from "../trash/trash.model";
 
 // Create new coupon
 const createCoupon = async (couponData: Partial<ICoupon>): Promise<ICoupon> => {
@@ -259,12 +260,27 @@ const updateCoupon = async (
 };
 
 // Delete coupon
-const deleteCoupon = async (id: string): Promise<void> => {
-  const coupon = await Coupon.findByIdAndDelete(id);
+const deleteCoupon = async (id: string, deletedBy?: string): Promise<void> => {
+  const coupon = await Coupon.findById(id);
 
   if (!coupon) {
     throw new AppError(httpStatus.NOT_FOUND, "Coupon not found");
   }
+
+  // Fetch usage records so we can save them with the trash item
+  const usageRecords = await CouponUsage.find({ couponId: id }).lean();
+
+  // Move to trash before deleting
+  await TrashItem.create({
+    entityType: "coupon",
+    originalId: id,
+    entityLabel: coupon.code,
+    data: coupon.toObject(),
+    relatedData: { usageRecords },
+    deletedBy: deletedBy || undefined,
+  });
+
+  await Coupon.findByIdAndDelete(id);
 
   // Also delete usage records
   await CouponUsage.deleteMany({ couponId: id });

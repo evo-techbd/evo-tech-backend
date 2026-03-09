@@ -14,7 +14,7 @@ export declare const ReviewServices: {
     }> & {
         __v: number;
     }>;
-    deleteReviewFromDB: (reviewId: string) => Promise<import("mongoose").Document<unknown, {}, import("./review.interface").TReview, {}, {}> & import("./review.interface").TReview & Required<{
+    deleteReviewFromDB: (reviewId: string, deletedBy?: string) => Promise<import("mongoose").Document<unknown, {}, import("./review.interface").TReview, {}, {}> & import("./review.interface").TReview & Required<{
         _id: string;
     }> & {
         __v: number;

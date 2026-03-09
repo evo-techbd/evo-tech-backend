@@ -2,6 +2,7 @@ import { Brand } from "./brand.model";
 import { TBrand } from "./brand.interface";
 import AppError from "../../errors/AppError";
 import httpStatus from "http-status";
+import { TrashItem } from "../trash/trash.model";
 import { generateUniqueSlug } from "../../utils/slugify";
 import { uploadToCloudinary } from "../../utils/cloudinaryUpload";
 
@@ -114,11 +115,20 @@ const updateBrandIntoDB = async (
   return result;
 };
 
-const deleteBrandFromDB = async (id: string) => {
+const deleteBrandFromDB = async (id: string, deletedBy?: string) => {
   const brand = await Brand.findById(id);
   if (!brand) {
     throw new AppError(httpStatus.NOT_FOUND, "Brand not found");
   }
+
+  // Move to trash before deleting
+  await TrashItem.create({
+    entityType: "brand",
+    originalId: id,
+    entityLabel: brand.name,
+    data: brand.toObject(),
+    deletedBy: deletedBy || undefined,
+  });
 
   const result = await Brand.findByIdAndDelete(id);
   return result;

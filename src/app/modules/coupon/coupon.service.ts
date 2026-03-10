@@ -2,6 +2,7 @@ import { Coupon, CouponUsage } from "./coupon.model";
 import { ICoupon } from "./coupon.interface";
 import AppError from "../../errors/AppError";
 import httpStatus from "http-status";
+import { Types } from "mongoose";
 import { TrashItem } from "../trash/trash.model";
 
 // Create new coupon
@@ -143,7 +144,7 @@ const getCouponByCode = async (code: string): Promise<ICoupon | null> => {
 // Validate coupon for user and order
 const validateCoupon = async (
   code: string,
-  userId: string,
+  userId: Types.ObjectId | string,
   orderAmount: number,
 ) => {
   const coupon = await getCouponByCode(code);
@@ -195,8 +196,8 @@ const validateCoupon = async (
 // Apply coupon (record usage)
 const applyCoupon = async (
   code: string,
-  userId: string,
-  orderId: string,
+  userId: Types.ObjectId | string,
+  orderId: Types.ObjectId | string,
   discountApplied: number,
 ) => {
   const coupon = await Coupon.findOne({ code: code.toUpperCase() });
@@ -208,8 +209,8 @@ const applyCoupon = async (
   // Record usage
   await CouponUsage.create({
     couponId: coupon._id,
-    userId,
-    orderId,
+    userId: new Types.ObjectId(userId),
+    orderId: new Types.ObjectId(orderId),
     discountApplied,
   });
 

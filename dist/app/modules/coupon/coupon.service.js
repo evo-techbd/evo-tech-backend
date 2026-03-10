@@ -7,6 +7,7 @@ exports.CouponService = void 0;
 const coupon_model_1 = require("./coupon.model");
 const AppError_1 = __importDefault(require("../../errors/AppError"));
 const http_status_1 = __importDefault(require("http-status"));
+const mongoose_1 = require("mongoose");
 const trash_model_1 = require("../trash/trash.model");
 // Create new coupon
 const createCoupon = async (couponData) => {
@@ -147,8 +148,8 @@ const applyCoupon = async (code, userId, orderId, discountApplied) => {
     // Record usage
     await coupon_model_1.CouponUsage.create({
         couponId: coupon._id,
-        userId,
-        orderId,
+        userId: new mongoose_1.Types.ObjectId(userId),
+        orderId: new mongoose_1.Types.ObjectId(orderId),
         discountApplied,
     });
     // Increment usage count

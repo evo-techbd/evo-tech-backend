@@ -1,9 +1,10 @@
 import { ICoupon } from "./coupon.interface";
+import { Types } from "mongoose";
 export declare const CouponService: {
     createCoupon: (couponData: Partial<ICoupon>) => Promise<ICoupon>;
     getAllCoupons: (query: any) => Promise<{
         coupons: (import("mongoose").FlattenMaps<ICoupon> & Required<{
-            _id: string;
+            _id: Types.ObjectId;
         }> & {
             __v: number;
         })[];
@@ -16,11 +17,11 @@ export declare const CouponService: {
     }>;
     getCouponById: (id: string) => Promise<ICoupon | null>;
     getCouponByCode: (code: string) => Promise<ICoupon | null>;
-    validateCoupon: (code: string, userId: string, orderAmount: number) => Promise<{
+    validateCoupon: (code: string, userId: Types.ObjectId | string, orderAmount: number) => Promise<{
         coupon: ICoupon;
         discountAmount: number;
     }>;
-    applyCoupon: (code: string, userId: string, orderId: string, discountApplied: number) => Promise<{
+    applyCoupon: (code: string, userId: Types.ObjectId | string, orderId: Types.ObjectId | string, discountApplied: number) => Promise<{
         success: boolean;
         message: string;
     }>;
@@ -28,12 +29,12 @@ export declare const CouponService: {
     deleteCoupon: (id: string, deletedBy?: string) => Promise<void>;
     getCouponStats: (id: string) => Promise<{
         coupon: import("mongoose").Document<unknown, {}, ICoupon, {}, {}> & ICoupon & Required<{
-            _id: string;
+            _id: Types.ObjectId;
         }> & {
             __v: number;
         };
         usageRecords: (import("mongoose").Document<unknown, {}, import("./coupon.interface").ICouponUsage, {}, {}> & import("./coupon.interface").ICouponUsage & Required<{
-            _id: string;
+            _id: Types.ObjectId;
         }> & {
             __v: number;
         })[];

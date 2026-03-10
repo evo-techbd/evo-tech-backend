@@ -1,6 +1,6 @@
 import { IPageContent } from "./page-content.interface";
 export declare const PageContent: import("mongoose").Model<IPageContent, {}, {}, {}, import("mongoose").Document<unknown, {}, IPageContent, {}, {}> & IPageContent & Required<{
-    _id: unknown;
+    _id: import("mongoose").Types.ObjectId;
 }> & {
     __v: number;
 }, any>;

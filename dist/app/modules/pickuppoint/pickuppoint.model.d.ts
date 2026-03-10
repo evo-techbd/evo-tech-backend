@@ -1,6 +1,6 @@
 import { IPickupPoint } from "./pickuppoint.interface";
 export declare const PickupPoint: import("mongoose").Model<IPickupPoint, {}, {}, {}, import("mongoose").Document<unknown, {}, IPickupPoint, {}, {}> & IPickupPoint & Required<{
-    _id: unknown;
+    _id: import("mongoose").Types.ObjectId;
 }> & {
     __v: number;
 }, any>;

@@ -250,22 +250,22 @@ export declare const ProductServices: {
     }>;
     getAllUniqueColorsFromDB: () => Promise<any[]>;
     getAllFeaturedSectionsFromDB: () => Promise<(import("mongoose").FlattenMaps<import("../landingsection/landingsection.interface").ILandingSection> & Required<{
-        _id: import("mongoose").FlattenMaps<unknown>;
+        _id: Types.ObjectId;
     }> & {
         __v: number;
     })[]>;
     createFeaturedSectionIntoDB: (payload: any) => Promise<import("mongoose").Document<unknown, {}, import("../landingsection/landingsection.interface").ILandingSection, {}, {}> & import("../landingsection/landingsection.interface").ILandingSection & Required<{
-        _id: unknown;
+        _id: Types.ObjectId;
     }> & {
         __v: number;
     }>;
     updateFeaturedSectionIntoDB: (id: string, payload: any) => Promise<(import("mongoose").Document<unknown, {}, import("../landingsection/landingsection.interface").ILandingSection, {}, {}> & import("../landingsection/landingsection.interface").ILandingSection & Required<{
-        _id: unknown;
+        _id: Types.ObjectId;
     }> & {
         __v: number;
     }) | null>;
     deleteFeaturedSectionFromDB: (id: string) => Promise<(import("mongoose").Document<unknown, {}, import("../landingsection/landingsection.interface").ILandingSection, {}, {}> & import("../landingsection/landingsection.interface").ILandingSection & Required<{
-        _id: unknown;
+        _id: Types.ObjectId;
     }> & {
         __v: number;
     }) | null>;

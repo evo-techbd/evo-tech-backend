@@ -6,12 +6,13 @@ import routes from "./app/routes";
 import cookieParser from "cookie-parser";
 import notFound from "./app/middlewares/notFound";
 import config from "./app/config";
+import "@vercel/analytics/server";
 
 const app: Application = express();
 
 // Trust proxy - Required for Hostinger/Apache reverse proxy
 // This allows express-rate-limit to correctly identify users via X-Forwarded-For header
-app.set('trust proxy', true);
+app.set("trust proxy", true);
 
 // CORS configuration - Allow multiple origins
 const allowedOrigins = Array.isArray(config.cors_origin)
@@ -57,7 +58,7 @@ app.use(
     ],
     exposedHeaders: ["Content-Length", "X-Requested-With"],
     maxAge: 86400, // 24 hours
-  })
+  }),
 );
 
 // Handle preflight requests explicitly
@@ -68,48 +69,55 @@ app.use(cookieParser());
 // Skip timeout for specific routes that need more time (e.g., product creation with images)
 app.use((req: Request, res: Response, next: NextFunction) => {
   // Set 4-minute timeout for image upload routes, 30s for others
-  const isImageUpload = req.path.includes('/products') && ['POST', 'PUT'].includes(req.method);
+  const isImageUpload =
+    req.path.includes("/products") && ["POST", "PUT"].includes(req.method);
   const timeoutMs = isImageUpload ? 240000 : 30000; // 4 minutes : 30 seconds
-  
+
   req.setTimeout(timeoutMs, () => {
-    console.error(`[TIMEOUT] Request timed out after ${timeoutMs}ms: ${req.method} ${req.path}`);
+    console.error(
+      `[TIMEOUT] Request timed out after ${timeoutMs}ms: ${req.method} ${req.path}`,
+    );
     if (!res.headersSent) {
       res.status(httpStatus.REQUEST_TIMEOUT).json({
         success: false,
-        message: 'Request timeout - operation took too long',
+        message: "Request timeout - operation took too long",
       });
     }
   });
-  
+
   next();
 });
 
 // Request logging middleware - log all incoming requests
 app.use((req: Request, res: Response, next: NextFunction) => {
   const start = Date.now();
-  console.log(`[REQUEST] ${req.method} ${req.path} - Content-Type: ${req.headers['content-type'] || 'none'}`);
-  
-  res.on('finish', () => {
+  console.log(
+    `[REQUEST] ${req.method} ${req.path} - Content-Type: ${req.headers["content-type"] || "none"}`,
+  );
+
+  res.on("finish", () => {
     const duration = Date.now() - start;
-    console.log(`[RESPONSE] ${req.method} ${req.path} - Status: ${res.statusCode} - ${duration}ms`);
+    console.log(
+      `[RESPONSE] ${req.method} ${req.path} - Status: ${res.statusCode} - ${duration}ms`,
+    );
   });
-  
+
   next();
 });
 
 // Parser with size limits to handle large payloads (e.g., product images)
 // Skip parsing for multipart/form-data - let multer handle it
 app.use((req, res, next) => {
-  const contentType = req.headers['content-type'] || '';
-  if (contentType.includes('multipart/form-data')) {
-    console.log('⏭️  Skipping body parser for multipart/form-data');
+  const contentType = req.headers["content-type"] || "";
+  if (contentType.includes("multipart/form-data")) {
+    console.log("⏭️  Skipping body parser for multipart/form-data");
     return next();
   }
   next();
 });
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // API routes
 app.use("/api/v1", routes);

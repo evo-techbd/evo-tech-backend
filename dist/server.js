@@ -57,7 +57,7 @@ async function bootstrap() {
         server.timeout = 300000; // 5 minutes (300 seconds)
         server.keepAliveTimeout = 305000; // Slightly higher than timeout
         server.headersTimeout = 310000; // Slightly higher than keepAliveTimeout
-        console.log('⏱️  Server timeouts configured: 5 minutes');
+        console.log("⏱️  Server timeouts configured: 5 minutes");
     }
     catch (err) {
         console.error("Failed to start server:", err);
@@ -65,7 +65,7 @@ async function bootstrap() {
     }
 }
 // Only run bootstrap if not in Vercel (serverless)
-if (process.env.VERCEL !== '1') {
+if (process.env.VERCEL !== "1") {
     bootstrap();
 }
 // For Vercel serverless deployment

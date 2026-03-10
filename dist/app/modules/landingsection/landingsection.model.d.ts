@@ -1,6 +1,6 @@
 import { ILandingSection } from "./landingsection.interface";
 export declare const LandingSection: import("mongoose").Model<ILandingSection, {}, {}, {}, import("mongoose").Document<unknown, {}, ILandingSection, {}, {}> & ILandingSection & Required<{
-    _id: unknown;
+    _id: import("mongoose").Types.ObjectId;
 }> & {
     __v: number;
 }, any>;

@@ -1,8 +1,8 @@
-import { Document, Types } from 'mongoose';
+import { Document, Types } from "mongoose";
 export interface ICoupon extends Document {
     _id: Types.ObjectId;
     code: string;
-    discountType: 'percentage' | 'fixed';
+    discountType: "percentage" | "fixed";
     discountValue: number;
     minimumOrderAmount?: number;
     maximumDiscountAmount?: number;

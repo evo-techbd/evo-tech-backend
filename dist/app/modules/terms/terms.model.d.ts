@@ -1,6 +1,6 @@
 import { ITerms } from "./terms.interface";
 export declare const Terms: import("mongoose").Model<ITerms, {}, {}, {}, import("mongoose").Document<unknown, {}, ITerms, {}, {}> & ITerms & Required<{
-    _id: unknown;
+    _id: import("mongoose").Types.ObjectId;
 }> & {
     __v: number;
 }, any>;

@@ -1,32 +1,32 @@
 import { IWarranty } from "./warranty.interface";
 export declare const WarrantyService: {
     createOrUpdateWarrantyIntoDB: (payload: Partial<IWarranty>) => Promise<import("mongoose").Document<unknown, {}, IWarranty, {}, {}> & IWarranty & Required<{
-        _id: unknown;
+        _id: import("mongoose").Types.ObjectId;
     }> & {
         __v: number;
     }>;
     getActiveWarrantyFromDB: () => Promise<import("mongoose").Document<unknown, {}, IWarranty, {}, {}> & IWarranty & Required<{
-        _id: unknown;
+        _id: import("mongoose").Types.ObjectId;
     }> & {
         __v: number;
     }>;
     getAllWarrantyFromDB: () => Promise<(import("mongoose").Document<unknown, {}, IWarranty, {}, {}> & IWarranty & Required<{
-        _id: unknown;
+        _id: import("mongoose").Types.ObjectId;
     }> & {
         __v: number;
     })[]>;
     getSingleWarrantyFromDB: (id: string) => Promise<import("mongoose").Document<unknown, {}, IWarranty, {}, {}> & IWarranty & Required<{
-        _id: unknown;
+        _id: import("mongoose").Types.ObjectId;
     }> & {
         __v: number;
     }>;
     updateWarrantyIntoDB: (id: string, payload: Partial<IWarranty>) => Promise<(import("mongoose").Document<unknown, {}, IWarranty, {}, {}> & IWarranty & Required<{
-        _id: unknown;
+        _id: import("mongoose").Types.ObjectId;
     }> & {
         __v: number;
     }) | null>;
     deleteWarrantyFromDB: (id: string) => Promise<(import("mongoose").Document<unknown, {}, IWarranty, {}, {}> & IWarranty & Required<{
-        _id: unknown;
+        _id: import("mongoose").Types.ObjectId;
     }> & {
         __v: number;
     }) | null>;

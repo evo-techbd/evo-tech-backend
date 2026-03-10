@@ -28,7 +28,7 @@ process.on("unhandledRejection", (error) => {
 let dbConnected = false;
 async function connectDB() {
   if (dbConnected) return;
-  
+
   try {
     await mongoose.connect(config.db_url as string);
     console.log("🛢 Database connected successfully");
@@ -36,7 +36,7 @@ async function connectDB() {
 
     // Seed admin user if not exists
     await seedAdmin();
-    
+
     // Seed test orders (comment out after first run if you don't want to add more)
     // await seedTestOrders();
   } catch (err) {
@@ -59,8 +59,8 @@ async function bootstrap() {
     server.timeout = 300000; // 5 minutes (300 seconds)
     server.keepAliveTimeout = 305000; // Slightly higher than timeout
     server.headersTimeout = 310000; // Slightly higher than keepAliveTimeout
-    
-    console.log('⏱️  Server timeouts configured: 5 minutes');
+
+    console.log("⏱️  Server timeouts configured: 5 minutes");
   } catch (err) {
     console.error("Failed to start server:", err);
     process.exit(1);
@@ -68,7 +68,7 @@ async function bootstrap() {
 }
 
 // Only run bootstrap if not in Vercel (serverless)
-if (process.env.VERCEL !== '1') {
+if (process.env.VERCEL !== "1") {
   bootstrap();
 }
 

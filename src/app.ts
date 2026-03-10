@@ -6,7 +6,6 @@ import routes from "./app/routes";
 import cookieParser from "cookie-parser";
 import notFound from "./app/middlewares/notFound";
 import config from "./app/config";
-import "@vercel/analytics/server";
 
 const app: Application = express();
 
@@ -97,9 +96,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
   res.on("finish", () => {
     const duration = Date.now() - start;
-    console.log(
-      `[RESPONSE] ${req.method} ${req.path} - Status: ${res.statusCode} - ${duration}ms`,
-    );
+    console.log(`[RESPONSE] ${req.method} ${req.path} - Status: ${res.statusCode} - ${duration}ms`);
   });
 
   next();

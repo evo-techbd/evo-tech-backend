@@ -6,6 +6,7 @@ import routes from "./app/routes";
 import cookieParser from "cookie-parser";
 import notFound from "./app/middlewares/notFound";
 import config from "./app/config";
+import { track } from "@vercel/analytics/node";
 
 const app: Application = express();
 
@@ -92,6 +93,13 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   res.on('finish', () => {
     const duration = Date.now() - start;
     console.log(`[RESPONSE] ${req.method} ${req.path} - Status: ${res.statusCode} - ${duration}ms`);
+    // Track API requests with Vercel Analytics
+    track('api_request', {
+      method: req.method,
+      path: req.path,
+      status: res.statusCode,
+      duration,
+    }, { request: req }).catch(() => {});
   });
   
   next();

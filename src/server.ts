@@ -3,7 +3,6 @@ import mongoose from "mongoose";
 import app from "./app";
 import config from "./app/config";
 import { seedAdmin } from "./app/utils/seeding";
-import { seedTestOrders } from "./app/utils/seedOrders";
 
 let server: Server;
 

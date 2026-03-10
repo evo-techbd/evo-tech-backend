@@ -14,10 +14,10 @@ const app: Application = express();
 // This allows express-rate-limit to correctly identify users via X-Forwarded-For header
 app.set("trust proxy", true);
 
-// CORS configuration - Allow multiple origins
+// CORS configuration - Already parsed and merged in config
 const allowedOrigins = Array.isArray(config.cors_origin)
-  ? config.cors_origin
-  : [config.cors_origin];
+  ? Array.from(new Set(config.cors_origin)) // Remove duplicates
+  : [];
 
 // Log allowed origins for debugging
 console.log("Allowed CORS Origins:", allowedOrigins);
@@ -97,7 +97,9 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
   res.on("finish", () => {
     const duration = Date.now() - start;
-    console.log(`[RESPONSE] ${req.method} ${req.path} - Status: ${res.statusCode} - ${duration}ms`);
+    console.log(
+      `[RESPONSE] ${req.method} ${req.path} - Status: ${res.statusCode} - ${duration}ms`,
+    );
   });
 
   next();

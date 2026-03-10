@@ -16,10 +16,10 @@ const app = (0, express_1.default)();
 // Trust proxy - Required for Hostinger/Apache reverse proxy
 // This allows express-rate-limit to correctly identify users via X-Forwarded-For header
 app.set("trust proxy", true);
-// CORS configuration - Allow multiple origins
+// CORS configuration - Already parsed and merged in config
 const allowedOrigins = Array.isArray(config_1.default.cors_origin)
-    ? config_1.default.cors_origin
-    : [config_1.default.cors_origin];
+    ? Array.from(new Set(config_1.default.cors_origin)) // Remove duplicates
+    : [];
 // Log allowed origins for debugging
 console.log("Allowed CORS Origins:", allowedOrigins);
 app.use((0, cors_1.default)({

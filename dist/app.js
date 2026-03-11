@@ -11,7 +11,7 @@ const routes_1 = __importDefault(require("./app/routes"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const notFound_1 = __importDefault(require("./app/middlewares/notFound"));
 const config_1 = __importDefault(require("./app/config"));
-require("@vercel/analytics/server");
+// import "@vercel/analytics/server";
 const app = (0, express_1.default)();
 // Trust proxy - Required for Hostinger/Apache reverse proxy
 // This allows express-rate-limit to correctly identify users via X-Forwarded-For header

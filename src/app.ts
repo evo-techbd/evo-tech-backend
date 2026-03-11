@@ -6,7 +6,7 @@ import routes from "./app/routes";
 import cookieParser from "cookie-parser";
 import notFound from "./app/middlewares/notFound";
 import config from "./app/config";
-import "@vercel/analytics/server";
+// import "@vercel/analytics/server";
 
 const app: Application = express();
 

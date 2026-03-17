@@ -2,6 +2,7 @@ import { Order, OrderItem } from "./order.model";
 import { TOrder, TOrderItem } from "./order.interface";
 import AppError from "../../errors/AppError";
 import httpStatus from "http-status";
+import { TrashItem } from "../trash/trash.model";
 import { Product } from "../product/product.model";
 import mongoose, { Types } from "mongoose";
 import { NotificationServices } from "../notification/notification.service";
@@ -272,6 +273,15 @@ const getUserOrdersFromDB = async (
     searchQuery.paymentStatus = query.paymentStatus;
   }
 
+  if (query.category) {
+    const productsInCategory = await Product.find({ category: query.category }).select('_id');
+    const productIds = productsInCategory.map(p => p._id);
+    const orderItemsWithCategory = await OrderItem.find({ product: { $in: productIds } }).select('order');
+    const orderIds = orderItemsWithCategory.map(oi => oi.order);
+    
+    searchQuery._id = { $in: orderIds };
+  }
+
   const result = await Order.find(searchQuery)
     .populate("pickupPointId", "name address city phone hours")
     .skip(skip)
@@ -361,6 +371,15 @@ const getAllOrdersFromDB = async (query: Record<string, unknown>) => {
 
   if (query.user) {
     searchQuery.user = query.user;
+  }
+
+  if (query.category) {
+    const productsInCategory = await Product.find({ category: query.category }).select('_id');
+    const productIds = productsInCategory.map(p => p._id);
+    const orderItemsWithCategory = await OrderItem.find({ product: { $in: productIds } }).select('order');
+    const orderIds = orderItemsWithCategory.map(oi => oi.order);
+    
+    searchQuery._id = { $in: orderIds };
   }
 
   const result = await Order.find(searchQuery)
@@ -488,11 +507,24 @@ const updateOrderStatusIntoDB = async (
   return result;
 };
 
-const deleteOrderFromDB = async (orderId: string) => {
+const deleteOrderFromDB = async (orderId: string, deletedBy?: string) => {
   const order = await Order.findById(orderId);
   if (!order) {
     throw new AppError(httpStatus.NOT_FOUND, "Order not found");
   }
+
+  // Get order items to save in trash
+  const items = await OrderItem.find({ order: orderId }).lean();
+
+  // Move to trash before deleting
+  await TrashItem.create({
+    entityType: "order",
+    originalId: orderId,
+    entityLabel: order.orderNumber || "Unknown Order",
+    data: order.toObject(),
+    relatedData: { items },
+    deletedBy: deletedBy || undefined,
+  });
 
   // Delete order items
   await OrderItem.deleteMany({ order: orderId });

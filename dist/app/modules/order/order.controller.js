@@ -83,7 +83,8 @@ const updateOrderStatus = (0, catchAsync_1.catchAsync)(async (req, res) => {
 });
 const deleteOrder = (0, catchAsync_1.catchAsync)(async (req, res) => {
     const { id } = req.params;
-    await order_service_1.OrderServices.deleteOrderFromDB(id);
+    const userId = req.user?._id;
+    await order_service_1.OrderServices.deleteOrderFromDB(id, userId);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_1.default.OK,

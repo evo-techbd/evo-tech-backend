@@ -12,6 +12,7 @@ import { Subcategory } from "../subcategory/subcategory.model";
 import { Coupon, CouponUsage } from "../coupon/coupon.model";
 import { Review } from "../review/review.model";
 import { User } from "../user/user.model";
+import { Order, OrderItem } from "../order/order.model";
 
 const getModelForEntityType = (entityType: TTrashEntityType) => {
   switch (entityType) {
@@ -22,6 +23,7 @@ const getModelForEntityType = (entityType: TTrashEntityType) => {
     case "coupon":       return Coupon;
     case "review":       return Review;
     case "user":         return User;
+    case "order":        return Order;
     default:
       throw new AppError(httpStatus.BAD_REQUEST, `Unknown entity type: ${entityType}`);
   }
@@ -121,6 +123,17 @@ const restoreTrashItemFromDB = async (trashId: string) => {
         ...u,
         _id: new Types.ObjectId(u._id),
         couponId: restoredId,
+      }))
+    );
+  }
+
+  // For orders, also restore order items
+  if (trashItem.entityType === "order" && trashItem.relatedData?.items?.length) {
+    await OrderItem.insertMany(
+      trashItem.relatedData.items.map((item: any) => ({
+        ...item,
+        _id: new Types.ObjectId(item._id),
+        order: restoredId,
       }))
     );
   }

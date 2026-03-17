@@ -57,7 +57,7 @@ export declare const OrderServices: {
     }> & {
         __v: number;
     }) | null>;
-    deleteOrderFromDB: (orderId: string) => Promise<(mongoose.Document<unknown, {}, TOrder, {}, {}> & TOrder & Required<{
+    deleteOrderFromDB: (orderId: string, deletedBy?: string) => Promise<(mongoose.Document<unknown, {}, TOrder, {}, {}> & TOrder & Required<{
         _id: string;
     }> & {
         __v: number;

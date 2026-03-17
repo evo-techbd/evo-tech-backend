@@ -7,7 +7,8 @@ export type TTrashEntityType =
   | "subcategory"
   | "coupon"
   | "review"
-  | "user";
+  | "user"
+  | "order";
 
 export interface TTrashItem {
   _id?: Types.ObjectId;

@@ -6,7 +6,7 @@ const trashSchema = new Schema<TTrashItem>(
     entityType: {
       type: String,
       required: true,
-      enum: ["product", "brand", "category", "subcategory", "coupon", "review", "user"],
+      enum: ["product", "brand", "category", "subcategory", "coupon", "review", "user", "order"],
       index: true,
     },
     originalId: {

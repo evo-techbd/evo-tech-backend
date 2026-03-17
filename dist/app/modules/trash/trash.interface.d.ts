@@ -1,5 +1,5 @@
 import { Types } from "mongoose";
-export type TTrashEntityType = "product" | "brand" | "category" | "subcategory" | "coupon" | "review" | "user";
+export type TTrashEntityType = "product" | "brand" | "category" | "subcategory" | "coupon" | "review" | "user" | "order";
 export interface TTrashItem {
     _id?: Types.ObjectId;
     entityType: TTrashEntityType;

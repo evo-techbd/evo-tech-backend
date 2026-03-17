@@ -16,6 +16,7 @@ const subcategory_model_1 = require("../subcategory/subcategory.model");
 const coupon_model_1 = require("../coupon/coupon.model");
 const review_model_1 = require("../review/review.model");
 const user_model_1 = require("../user/user.model");
+const order_model_1 = require("../order/order.model");
 const getModelForEntityType = (entityType) => {
     switch (entityType) {
         case "product": return product_model_1.Product;
@@ -25,6 +26,7 @@ const getModelForEntityType = (entityType) => {
         case "coupon": return coupon_model_1.Coupon;
         case "review": return review_model_1.Review;
         case "user": return user_model_1.User;
+        case "order": return order_model_1.Order;
         default:
             throw new AppError_1.default(http_status_1.default.BAD_REQUEST, `Unknown entity type: ${entityType}`);
     }
@@ -99,6 +101,14 @@ const restoreTrashItemFromDB = async (trashId) => {
             ...u,
             _id: new mongoose_1.Types.ObjectId(u._id),
             couponId: restoredId,
+        })));
+    }
+    // For orders, also restore order items
+    if (trashItem.entityType === "order" && trashItem.relatedData?.items?.length) {
+        await order_model_1.OrderItem.insertMany(trashItem.relatedData.items.map((item) => ({
+            ...item,
+            _id: new mongoose_1.Types.ObjectId(item._id),
+            order: restoredId,
         })));
     }
     // Remove from trash

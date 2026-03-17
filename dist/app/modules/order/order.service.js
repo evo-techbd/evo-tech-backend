@@ -40,6 +40,7 @@ exports.OrderServices = exports.normalizeOrderObject = void 0;
 const order_model_1 = require("./order.model");
 const AppError_1 = __importDefault(require("../../errors/AppError"));
 const http_status_1 = __importDefault(require("http-status"));
+const trash_model_1 = require("../trash/trash.model");
 const product_model_1 = require("../product/product.model");
 const mongoose_1 = __importStar(require("mongoose"));
 const notification_service_1 = require("../notification/notification.service");
@@ -248,6 +249,13 @@ const getUserOrdersFromDB = async (userUuid, query) => {
     if (query.paymentStatus) {
         searchQuery.paymentStatus = query.paymentStatus;
     }
+    if (query.category) {
+        const productsInCategory = await product_model_1.Product.find({ category: query.category }).select('_id');
+        const productIds = productsInCategory.map(p => p._id);
+        const orderItemsWithCategory = await order_model_1.OrderItem.find({ product: { $in: productIds } }).select('order');
+        const orderIds = orderItemsWithCategory.map(oi => oi.order);
+        searchQuery._id = { $in: orderIds };
+    }
     const result = await order_model_1.Order.find(searchQuery)
         .populate("pickupPointId", "name address city phone hours")
         .skip(skip)
@@ -318,6 +326,13 @@ const getAllOrdersFromDB = async (query) => {
     }
     if (query.user) {
         searchQuery.user = query.user;
+    }
+    if (query.category) {
+        const productsInCategory = await product_model_1.Product.find({ category: query.category }).select('_id');
+        const productIds = productsInCategory.map(p => p._id);
+        const orderItemsWithCategory = await order_model_1.OrderItem.find({ product: { $in: productIds } }).select('order');
+        const orderIds = orderItemsWithCategory.map(oi => oi.order);
+        searchQuery._id = { $in: orderIds };
     }
     const result = await order_model_1.Order.find(searchQuery)
         .populate("pickupPointId", "name address city phone hours")
@@ -422,11 +437,22 @@ const updateOrderStatusIntoDB = async (orderId, payload) => {
     });
     return result;
 };
-const deleteOrderFromDB = async (orderId) => {
+const deleteOrderFromDB = async (orderId, deletedBy) => {
     const order = await order_model_1.Order.findById(orderId);
     if (!order) {
         throw new AppError_1.default(http_status_1.default.NOT_FOUND, "Order not found");
     }
+    // Get order items to save in trash
+    const items = await order_model_1.OrderItem.find({ order: orderId }).lean();
+    // Move to trash before deleting
+    await trash_model_1.TrashItem.create({
+        entityType: "order",
+        originalId: orderId,
+        entityLabel: order.orderNumber || "Unknown Order",
+        data: order.toObject(),
+        relatedData: { items },
+        deletedBy: deletedBy || undefined,
+    });
     // Delete order items
     await order_model_1.OrderItem.deleteMany({ order: orderId });
     // Delete order

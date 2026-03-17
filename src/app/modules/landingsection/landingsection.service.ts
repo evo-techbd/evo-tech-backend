@@ -20,7 +20,7 @@ const getActiveLandingSectionsFromDB = async () => {
     .populate({
       path: "products",
       select: "name slug price salePrice mainImage rating stockStatus",
-      match: { isActive: true },
+      match: { published: true },
     });
 
   return result;

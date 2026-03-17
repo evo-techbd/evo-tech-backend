@@ -938,6 +938,7 @@ const getAllFeaturedSectionsFromDB = async () => {
     .populate({
       path: "products",
       select: "name slug price previousPrice preOrderPrice  mainImage",
+      match: { published: true },
     })
     .lean(); // Add lean() to get plain JavaScript objects
 

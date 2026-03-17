@@ -94,6 +94,54 @@ const normalizeOrderObject = (orderDoc) => {
     return obj;
 };
 exports.normalizeOrderObject = normalizeOrderObject;
+const toValidObjectId = (value) => {
+    if (!value)
+        return null;
+    if (value instanceof mongoose_1.Types.ObjectId) {
+        return value;
+    }
+    if (typeof value === "string" && mongoose_1.Types.ObjectId.isValid(value)) {
+        return new mongoose_1.Types.ObjectId(value);
+    }
+    if (typeof value === "object" && value !== null && "_id" in value) {
+        const nestedId = value._id;
+        if (nestedId instanceof mongoose_1.Types.ObjectId) {
+            return nestedId;
+        }
+        if (typeof nestedId === "string" && mongoose_1.Types.ObjectId.isValid(nestedId)) {
+            return new mongoose_1.Types.ObjectId(nestedId);
+        }
+    }
+    return null;
+};
+const hydratePickupPointsForOrders = async (orders) => {
+    if (!orders.length)
+        return orders;
+    const uniquePickupIds = Array.from(new Set(orders
+        .map((order) => toValidObjectId(order.pickupPointId))
+        .filter(Boolean)
+        .map((id) => id.toString())));
+    if (!uniquePickupIds.length)
+        return orders;
+    const pickupPoints = await pickuppoint_model_1.PickupPoint.find({
+        _id: { $in: uniquePickupIds.map((id) => new mongoose_1.Types.ObjectId(id)) },
+    })
+        .select("name address city phone hours")
+        .lean();
+    const pickupPointMap = new Map(pickupPoints.map((point) => [point._id.toString(), point]));
+    return orders.map((order) => {
+        const pickupId = toValidObjectId(order.pickupPointId);
+        if (!pickupId)
+            return order;
+        const pickupPoint = pickupPointMap.get(pickupId.toString());
+        if (!pickupPoint)
+            return order;
+        return {
+            ...order,
+            pickupPointId: pickupPoint,
+        };
+    });
+};
 const roundToTwo = (value) => Math.round(value * 100) / 100;
 const calculateDepositBreakdown = (productDetails, totalPayable) => {
     let preOrderItemsCount = 0;
@@ -190,6 +238,13 @@ const placeOrderIntoDB = async (payload, userUuid) => {
         await product_model_1.Product.findByIdAndUpdate(detail.product._id, {
             $inc: { stock: -detail.quantity },
         });
+        // Also deduct from the specific color variation if one was selected
+        if (detail.selectedColor) {
+            await product_model_1.ProductColorVariation.findOneAndUpdate({
+                product: detail.product._id,
+                colorName: { $regex: new RegExp(`^${detail.selectedColor}$`, "i") },
+            }, { $inc: { stock: -detail.quantity } });
+        }
         await notification_service_1.NotificationServices.evaluateStockForProduct(detail.product._id);
     }
     // Get full order with items
@@ -253,21 +308,25 @@ const getUserOrdersFromDB = async (userUuid, query) => {
         searchQuery.paymentStatus = query.paymentStatus;
     }
     if (query.category) {
-        const productsInCategory = await product_model_1.Product.find({ category: query.category }).select('_id');
-        const productIds = productsInCategory.map(p => p._id);
-        const orderItemsWithCategory = await order_model_1.OrderItem.find({ product: { $in: productIds } }).select('order');
-        const orderIds = orderItemsWithCategory.map(oi => oi.order);
+        const productsInCategory = await product_model_1.Product.find({
+            category: query.category,
+        }).select("_id");
+        const productIds = productsInCategory.map((p) => p._id);
+        const orderItemsWithCategory = await order_model_1.OrderItem.find({
+            product: { $in: productIds },
+        }).select("order");
+        const orderIds = orderItemsWithCategory.map((oi) => oi.order);
         searchQuery._id = { $in: orderIds };
     }
     const result = await order_model_1.Order.find(searchQuery)
-        .populate("pickupPointId", "name address city phone hours")
         .skip(skip)
         .limit(limit)
         .sort({ createdAt: -1 })
         .lean();
+    const ordersWithPickupPoints = await hydratePickupPointsForOrders(result);
     let itemCountMap = new Map();
-    if (result.length) {
-        const orderIds = result
+    if (ordersWithPickupPoints.length) {
+        const orderIds = ordersWithPickupPoints
             .map((order) => order._id)
             .filter(Boolean)
             .map((id) => typeof id === "string"
@@ -292,7 +351,7 @@ const getUserOrdersFromDB = async (userUuid, query) => {
     }
     const total = await order_model_1.Order.countDocuments(searchQuery);
     return {
-        result: result.map((r) => {
+        result: ordersWithPickupPoints.map((r) => {
             const normalized = (0, exports.normalizeOrderObject)(r);
             const countInfo = itemCountMap.get(r._id?.toString?.() || "");
             return {
@@ -313,6 +372,7 @@ const getAllOrdersFromDB = async (query) => {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 10;
     const skip = (page - 1) * limit;
+    const includeItems = query.includeItems === true || query.includeItems === "true";
     const searchQuery = {};
     if (query.search) {
         searchQuery.$or = [
@@ -331,43 +391,68 @@ const getAllOrdersFromDB = async (query) => {
         searchQuery.user = query.user;
     }
     if (query.category) {
-        const productsInCategory = await product_model_1.Product.find({ category: query.category }).select('_id');
-        const productIds = productsInCategory.map(p => p._id);
-        const orderItemsWithCategory = await order_model_1.OrderItem.find({ product: { $in: productIds } }).select('order');
-        const orderIds = orderItemsWithCategory.map(oi => oi.order);
+        const productsInCategory = await product_model_1.Product.find({
+            category: query.category,
+        }).select("_id");
+        const productIds = productsInCategory.map((p) => p._id);
+        const orderItemsWithCategory = await order_model_1.OrderItem.find({
+            product: { $in: productIds },
+        }).select("order");
+        const orderIds = orderItemsWithCategory.map((oi) => oi.order);
         searchQuery._id = { $in: orderIds };
     }
-    const result = await order_model_1.Order.find(searchQuery)
-        .populate("pickupPointId", "name address city phone hours")
-        .skip(skip)
-        .limit(limit)
-        .sort({ createdAt: -1 });
-    const total = await order_model_1.Order.countDocuments(searchQuery);
-    // Populate order items with product data including category
-    const ordersWithItems = await Promise.all(result.map(async (order) => {
-        const orderItems = await order_model_1.OrderItem.find({ order: order._id }).populate({
-            path: "product",
-            populate: {
-                path: "category",
-                select: "name slug",
-            },
-        });
-        return {
+    const [result, total] = await Promise.all([
+        order_model_1.Order.find(searchQuery)
+            .skip(skip)
+            .limit(limit)
+            .sort({ createdAt: -1 })
+            .lean(),
+        order_model_1.Order.countDocuments(searchQuery),
+    ]);
+    const ordersWithPickupPoints = await hydratePickupPointsForOrders(result);
+    let ordersWithItems = ordersWithPickupPoints.map((order) => (0, exports.normalizeOrderObject)(order));
+    if (includeItems) {
+        const orderIds = ordersWithPickupPoints
+            .map((order) => order._id)
+            .filter(Boolean)
+            .map((id) => (typeof id === "string" ? new mongoose_1.Types.ObjectId(id) : id));
+        let itemsByOrderId = new Map();
+        if (orderIds.length) {
+            const allOrderItems = await order_model_1.OrderItem.find({ order: { $in: orderIds } })
+                .populate({
+                path: "product",
+                populate: {
+                    path: "category",
+                    select: "name slug",
+                },
+            })
+                .lean();
+            itemsByOrderId = allOrderItems.reduce((acc, item) => {
+                const key = item.order?.toString?.();
+                if (!key)
+                    return acc;
+                const list = acc.get(key) || [];
+                list.push({
+                    _id: item._id,
+                    order: item.order,
+                    product: item.product,
+                    productName: item.productName,
+                    productPrice: item.productPrice,
+                    quantity: item.quantity,
+                    selectedColor: item.selectedColor,
+                    subtotal: item.subtotal,
+                    createdAt: item.createdAt,
+                    updatedAt: item.updatedAt,
+                });
+                acc.set(key, list);
+                return acc;
+            }, new Map());
+        }
+        ordersWithItems = ordersWithPickupPoints.map((order) => ({
             ...(0, exports.normalizeOrderObject)(order),
-            orderItems: orderItems.map((item) => ({
-                _id: item._id,
-                order: item.order,
-                product: item.product,
-                productName: item.productName,
-                productPrice: item.productPrice,
-                quantity: item.quantity,
-                selectedColor: item.selectedColor,
-                subtotal: item.subtotal,
-                createdAt: item.createdAt,
-                updatedAt: item.updatedAt,
-            })),
-        };
-    }));
+            orderItems: itemsByOrderId.get(order._id?.toString?.() || "") || [],
+        }));
+    }
     return {
         result: ordersWithItems,
         meta: {
@@ -383,13 +468,14 @@ const getSingleOrderFromDB = async (orderId, userUuid) => {
     if (userUuid) {
         query.user = userUuid;
     }
-    const order = await order_model_1.Order.findOne(query).populate("pickupPointId", "name address city phone hours");
+    const order = await order_model_1.Order.findOne(query).lean();
     if (!order) {
         throw new AppError_1.default(http_status_1.default.NOT_FOUND, "Order not found");
     }
+    const [hydratedOrder] = await hydratePickupPointsForOrders([order]);
     const orderItems = await order_model_1.OrderItem.find({ order: orderId }).populate("product");
     return {
-        order: (0, exports.normalizeOrderObject)(order),
+        order: (0, exports.normalizeOrderObject)(hydratedOrder),
         items: orderItems,
     };
 };
@@ -403,7 +489,8 @@ const updateOrderStatusIntoDB = async (orderId, payload) => {
         payload.deliveredAt = new Date();
     }
     // If order is being cancelled, auto-set payment status unless explicitly provided
-    if (payload.orderStatus === "cancelled" && payload.paymentStatus === undefined) {
+    if (payload.orderStatus === "cancelled" &&
+        payload.paymentStatus === undefined) {
         if (order.paymentStatus === "paid") {
             payload.paymentStatus = "refunded";
         }

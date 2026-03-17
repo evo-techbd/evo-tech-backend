@@ -3,12 +3,12 @@ import { TOrder, TOrderItem } from "./order.interface";
 import AppError from "../../errors/AppError";
 import httpStatus from "http-status";
 import { TrashItem } from "../trash/trash.model";
-import { Product } from "../product/product.model";
+import { Product, ProductColorVariation } from "../product/product.model";
 import mongoose, { Types } from "mongoose";
 import { NotificationServices } from "../notification/notification.service";
 import { emailService } from "../../utils/emailService";
 import { Review } from "../review/review.model";
-import { PickupPoint } from "../pickuppoint/pickuppoint.model"
+import { PickupPoint } from "../pickuppoint/pickuppoint.model";
 
 const generateOrderNumber = (): string => {
   const timestamp = Date.now().toString();
@@ -56,6 +56,73 @@ export const normalizeOrderObject = (orderDoc: any) => {
   obj.firstname = obj.firstname || obj.firstName || "";
   obj.lastname = obj.lastname || obj.lastName || "";
   return obj;
+};
+
+const toValidObjectId = (value: unknown): Types.ObjectId | null => {
+  if (!value) return null;
+
+  if (value instanceof Types.ObjectId) {
+    return value;
+  }
+
+  if (typeof value === "string" && Types.ObjectId.isValid(value)) {
+    return new Types.ObjectId(value);
+  }
+
+  if (typeof value === "object" && value !== null && "_id" in value) {
+    const nestedId = (value as { _id?: unknown })._id;
+    if (nestedId instanceof Types.ObjectId) {
+      return nestedId;
+    }
+
+    if (typeof nestedId === "string" && Types.ObjectId.isValid(nestedId)) {
+      return new Types.ObjectId(nestedId);
+    }
+  }
+
+  return null;
+};
+
+const hydratePickupPointsForOrders = async <
+  T extends { pickupPointId?: unknown },
+>(
+  orders: T[],
+): Promise<T[]> => {
+  if (!orders.length) return orders;
+
+  const uniquePickupIds = Array.from(
+    new Set(
+      orders
+        .map((order) => toValidObjectId(order.pickupPointId))
+        .filter(Boolean)
+        .map((id) => id!.toString()),
+    ),
+  );
+
+  if (!uniquePickupIds.length) return orders;
+
+  const pickupPoints = await PickupPoint.find({
+    _id: { $in: uniquePickupIds.map((id) => new Types.ObjectId(id)) },
+  })
+    .select("name address city phone hours")
+    .lean();
+
+  const pickupPointMap = new Map(
+    pickupPoints.map((point) => [point._id.toString(), point]),
+  );
+
+  return orders.map((order) => {
+    const pickupId = toValidObjectId(order.pickupPointId);
+    if (!pickupId) return order;
+
+    const pickupPoint = pickupPointMap.get(pickupId.toString());
+    if (!pickupPoint) return order;
+
+    return {
+      ...order,
+      pickupPointId: pickupPoint,
+    };
+  });
 };
 
 interface DepositBreakdown {
@@ -200,6 +267,18 @@ const placeOrderIntoDB = async (
     await Product.findByIdAndUpdate(detail.product._id, {
       $inc: { stock: -detail.quantity },
     });
+
+    // Also deduct from the specific color variation if one was selected
+    if (detail.selectedColor) {
+      await ProductColorVariation.findOneAndUpdate(
+        {
+          product: detail.product._id,
+          colorName: { $regex: new RegExp(`^${detail.selectedColor}$`, "i") },
+        },
+        { $inc: { stock: -detail.quantity } },
+      );
+    }
+
     await NotificationServices.evaluateStockForProduct(detail.product._id);
   }
 
@@ -214,11 +293,12 @@ const placeOrderIntoDB = async (
     emailService
       .sendOrderConfirmation({
         customerEmail: orderData.email,
-        customerName: `${orderData.firstname} ${orderData.lastname || ""}`.trim(),
+        customerName:
+          `${orderData.firstname} ${orderData.lastname || ""}`.trim(),
         orderNumber: orderData.orderNumber,
         trackingCode: orderData.trackingCode || "",
         orderDate: new Date(
-          fullOrder?.createdAt || Date.now()
+          fullOrder?.createdAt || Date.now(),
         ).toLocaleDateString("en-US", {
           year: "numeric",
           month: "long",
@@ -277,24 +357,29 @@ const getUserOrdersFromDB = async (
   }
 
   if (query.category) {
-    const productsInCategory = await Product.find({ category: query.category }).select('_id');
-    const productIds = productsInCategory.map(p => p._id);
-    const orderItemsWithCategory = await OrderItem.find({ product: { $in: productIds } }).select('order');
-    const orderIds = orderItemsWithCategory.map(oi => oi.order);
-    
+    const productsInCategory = await Product.find({
+      category: query.category,
+    }).select("_id");
+    const productIds = productsInCategory.map((p) => p._id);
+    const orderItemsWithCategory = await OrderItem.find({
+      product: { $in: productIds },
+    }).select("order");
+    const orderIds = orderItemsWithCategory.map((oi) => oi.order);
+
     searchQuery._id = { $in: orderIds };
   }
 
   const result = await Order.find(searchQuery)
-    .populate("pickupPointId", "name address city phone hours")
     .skip(skip)
     .limit(limit)
     .sort({ createdAt: -1 })
     .lean();
 
+  const ordersWithPickupPoints = await hydratePickupPointsForOrders(result);
+
   let itemCountMap = new Map<string, { quantity: number; lines: number }>();
-  if (result.length) {
-    const orderIds = result
+  if (ordersWithPickupPoints.length) {
+    const orderIds = ordersWithPickupPoints
       .map((order) => order._id)
       .filter(Boolean)
       .map((id) =>
@@ -331,7 +416,7 @@ const getUserOrdersFromDB = async (
   const total = await Order.countDocuments(searchQuery);
 
   return {
-    result: result.map((r) => {
+    result: ordersWithPickupPoints.map((r) => {
       const normalized = normalizeOrderObject(r);
       const countInfo = itemCountMap.get(r._id?.toString?.() || "");
       return {
@@ -353,6 +438,8 @@ const getAllOrdersFromDB = async (query: Record<string, unknown>) => {
   const page = Number(query.page) || 1;
   const limit = Number(query.limit) || 10;
   const skip = (page - 1) * limit;
+  const includeItems =
+    query.includeItems === true || query.includeItems === "true";
 
   const searchQuery: any = {};
 
@@ -377,36 +464,58 @@ const getAllOrdersFromDB = async (query: Record<string, unknown>) => {
   }
 
   if (query.category) {
-    const productsInCategory = await Product.find({ category: query.category }).select('_id');
-    const productIds = productsInCategory.map(p => p._id);
-    const orderItemsWithCategory = await OrderItem.find({ product: { $in: productIds } }).select('order');
-    const orderIds = orderItemsWithCategory.map(oi => oi.order);
-    
+    const productsInCategory = await Product.find({
+      category: query.category,
+    }).select("_id");
+    const productIds = productsInCategory.map((p) => p._id);
+    const orderItemsWithCategory = await OrderItem.find({
+      product: { $in: productIds },
+    }).select("order");
+    const orderIds = orderItemsWithCategory.map((oi) => oi.order);
+
     searchQuery._id = { $in: orderIds };
   }
 
-  const result = await Order.find(searchQuery)
-    .populate("pickupPointId", "name address city phone hours")
-    .skip(skip)
-    .limit(limit)
-    .sort({ createdAt: -1 });
+  const [result, total] = await Promise.all([
+    Order.find(searchQuery)
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 })
+      .lean(),
+    Order.countDocuments(searchQuery),
+  ]);
 
-  const total = await Order.countDocuments(searchQuery);
+  const ordersWithPickupPoints = await hydratePickupPointsForOrders(result);
 
-  // Populate order items with product data including category
-  const ordersWithItems = await Promise.all(
-    result.map(async (order) => {
-      const orderItems = await OrderItem.find({ order: order._id }).populate({
-        path: "product",
-        populate: {
-          path: "category",
-          select: "name slug",
-        },
-      });
+  let ordersWithItems = ordersWithPickupPoints.map((order) =>
+    normalizeOrderObject(order),
+  );
 
-      return {
-        ...normalizeOrderObject(order),
-        orderItems: orderItems.map((item) => ({
+  if (includeItems) {
+    const orderIds = ordersWithPickupPoints
+      .map((order) => order._id)
+      .filter(Boolean)
+      .map((id) => (typeof id === "string" ? new Types.ObjectId(id) : id));
+
+    let itemsByOrderId = new Map<string, any[]>();
+
+    if (orderIds.length) {
+      const allOrderItems = await OrderItem.find({ order: { $in: orderIds } })
+        .populate({
+          path: "product",
+          populate: {
+            path: "category",
+            select: "name slug",
+          },
+        })
+        .lean();
+
+      itemsByOrderId = allOrderItems.reduce((acc, item) => {
+        const key = item.order?.toString?.();
+        if (!key) return acc;
+
+        const list = acc.get(key) || [];
+        list.push({
           _id: item._id,
           order: item.order,
           product: item.product,
@@ -417,10 +526,18 @@ const getAllOrdersFromDB = async (query: Record<string, unknown>) => {
           subtotal: item.subtotal,
           createdAt: item.createdAt,
           updatedAt: item.updatedAt,
-        })),
-      };
-    }),
-  );
+        });
+
+        acc.set(key, list);
+        return acc;
+      }, new Map<string, any[]>());
+    }
+
+    ordersWithItems = ordersWithPickupPoints.map((order) => ({
+      ...normalizeOrderObject(order),
+      orderItems: itemsByOrderId.get(order._id?.toString?.() || "") || [],
+    }));
+  }
 
   return {
     result: ordersWithItems,
@@ -439,20 +556,19 @@ const getSingleOrderFromDB = async (orderId: string, userUuid?: string) => {
     query.user = userUuid;
   }
 
-  const order = await Order.findOne(query).populate(
-    "pickupPointId",
-    "name address city phone hours",
-  );
+  const order = await Order.findOne(query).lean();
   if (!order) {
     throw new AppError(httpStatus.NOT_FOUND, "Order not found");
   }
+
+  const [hydratedOrder] = await hydratePickupPointsForOrders([order]);
 
   const orderItems = await OrderItem.find({ order: orderId }).populate(
     "product",
   );
 
   return {
-    order: normalizeOrderObject(order),
+    order: normalizeOrderObject(hydratedOrder),
     items: orderItems,
   };
 };
@@ -472,7 +588,10 @@ const updateOrderStatusIntoDB = async (
   }
 
   // If order is being cancelled, auto-set payment status unless explicitly provided
-  if (payload.orderStatus === "cancelled" && payload.paymentStatus === undefined) {
+  if (
+    payload.orderStatus === "cancelled" &&
+    payload.paymentStatus === undefined
+  ) {
     if (order.paymentStatus === "paid") {
       payload.paymentStatus = "refunded";
     } else if (order.paymentStatus === "partial") {
@@ -691,10 +810,7 @@ const trackOrderByTrackingCode = async (trackingCode: string) => {
   const trimmedCode = trackingCode?.trim();
 
   if (!trimmedCode) {
-    throw new AppError(
-      httpStatus.BAD_REQUEST,
-      "Tracking code is required",
-    );
+    throw new AppError(httpStatus.BAD_REQUEST, "Tracking code is required");
   }
 
   // Find order first without populate to avoid casting errors

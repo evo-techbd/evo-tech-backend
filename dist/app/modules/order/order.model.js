@@ -229,6 +229,17 @@ const orderItemSchema = new mongoose_1.Schema({
 }, {
     timestamps: true,
 });
+// Common admin dashboard query paths
+orderSchema.index({ createdAt: -1 });
+orderSchema.index({ orderStatus: 1, createdAt: -1 });
+orderSchema.index({ paymentStatus: 1, createdAt: -1 });
+orderSchema.index({ user: 1, createdAt: -1 });
+orderSchema.index({ email: 1 });
+orderSchema.index({ phone: 1 });
+orderSchema.index({ trackingCode: 1 });
+// Common order item lookup paths
+orderItemSchema.index({ order: 1 });
+orderItemSchema.index({ product: 1 });
 exports.Order = (0, mongoose_1.model)("Order", orderSchema);
 exports.OrderItem = (0, mongoose_1.model)("OrderItem", orderItemSchema);
 //# sourceMappingURL=order.model.js.map

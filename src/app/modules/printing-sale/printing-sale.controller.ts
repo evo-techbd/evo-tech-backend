@@ -65,10 +65,22 @@ const deleteSale = catchAsync(async (req, res) => {
   });
 });
 
+const updateSale = catchAsync(async (req, res) => {
+  const result = await PrintingSaleServices.updateSale(req.params.id, req.body);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Printing sale updated successfully",
+    data: result,
+  });
+});
+
 export const PrintingSaleControllers = {
   createSale,
   getAllSales,
   getSingleSale,
   updatePaymentStatus,
+  updateSale,
   deleteSale,
 };

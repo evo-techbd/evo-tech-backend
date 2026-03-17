@@ -12,6 +12,7 @@ const router = express_1.default.Router();
 router.post("/", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN), printing_sale_controller_1.PrintingSaleControllers.createSale);
 router.get("/", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN), printing_sale_controller_1.PrintingSaleControllers.getAllSales);
 router.get("/:id", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN), printing_sale_controller_1.PrintingSaleControllers.getSingleSale);
+router.patch("/:id", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN), printing_sale_controller_1.PrintingSaleControllers.updateSale);
 router.patch("/:id/payment-status", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN), printing_sale_controller_1.PrintingSaleControllers.updatePaymentStatus);
 router.delete("/:id", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN), printing_sale_controller_1.PrintingSaleControllers.deleteSale);
 exports.PrintingSaleRoutes = router;

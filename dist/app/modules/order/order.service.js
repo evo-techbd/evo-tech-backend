@@ -195,9 +195,10 @@ const placeOrderIntoDB = async (payload, userUuid) => {
     // Get full order with items
     const fullOrder = await order_model_1.Order.findById(order._id);
     const orderItems = await order_model_1.OrderItem.find({ order: order._id }).populate("product");
-    // Send order confirmation email
+    // Send order confirmation email asynchronously in the background
     try {
-        await emailService_1.emailService.sendOrderConfirmation({
+        emailService_1.emailService
+            .sendOrderConfirmation({
             customerEmail: orderData.email,
             customerName: `${orderData.firstname} ${orderData.lastname || ""}`.trim(),
             orderNumber: orderData.orderNumber,
@@ -227,11 +228,13 @@ const placeOrderIntoDB = async (payload, userUuid) => {
             isPreOrderOrder: depositInfo.isPreOrderOrder,
             depositDue: depositInfo.depositDue,
             balanceDue: depositInfo.balanceDue,
+        })
+            .catch((emailError) => {
+            console.error("Failed to send order confirmation email:", emailError);
         });
     }
-    catch (emailError) {
-        console.error("Failed to send order confirmation email:", emailError);
-        // Don't throw - we don't want to fail the order if email fails
+    catch (err) {
+        console.error("Failed to dispatch order confirmation email process:", err);
     }
     return {
         order: (0, exports.normalizeOrderObject)(fullOrder),

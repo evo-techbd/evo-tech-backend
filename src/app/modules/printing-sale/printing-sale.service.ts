@@ -78,6 +78,25 @@ const updateSalePaymentStatus = async (
   return result;
 };
 
+const updateSale = async (id: string, payload: Partial<TPrintingSale>) => {
+  let updateData = { ...payload };
+  
+  // Recalculate prices if items are provided
+  if (payload.items && payload.items.length > 0) {
+    const items = payload.items.map((item) => ({
+      ...item,
+      price: item.unitPrice * item.quantity,
+    }));
+    const totalPrice = items.reduce((sum, item) => sum + item.price, 0);
+    updateData = { ...updateData, items, totalPrice };
+  }
+
+  const result = await PrintingSale.findByIdAndUpdate(id, updateData, {
+    new: true,
+  });
+  return result;
+};
+
 const deleteSale = async (id: string) => {
   const result = await PrintingSale.findByIdAndDelete(id);
   return result;
@@ -88,5 +107,6 @@ export const PrintingSaleServices = {
   getAllSales,
   getSingleSale,
   updateSalePaymentStatus,
+  updateSale,
   deleteSale,
 };

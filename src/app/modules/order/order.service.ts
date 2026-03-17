@@ -209,44 +209,47 @@ const placeOrderIntoDB = async (
     "product",
   );
 
-  // Send order confirmation email
+  // Send order confirmation email asynchronously in the background
   try {
-    await emailService.sendOrderConfirmation({
-      customerEmail: orderData.email,
-      customerName: `${orderData.firstname} ${orderData.lastname || ""}`.trim(),
-      orderNumber: orderData.orderNumber,
-      trackingCode: orderData.trackingCode || "",
-      orderDate: new Date(
-        fullOrder?.createdAt || Date.now(),
-      ).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      }),
-      items: orderItems.map((item: any) => ({
-        productName: item.productName,
-        quantity: item.quantity,
-        price: item.productPrice,
-        subtotal: item.subtotal,
-        selectedColor: item.selectedColor,
-      })),
-      subtotal: orderData.subtotal || 0,
-      deliveryCharge: orderData.deliveryCharge || 0,
-      totalPayable: orderData.totalPayable || 0,
-      shippingAddress: {
-        fullName: `${orderData.firstname} ${orderData.lastname || ""}`.trim(),
-        phone: orderData.phone,
-        address: orderData.houseStreet,
-        city: orderData.city,
-        subdistrict: orderData.subdistrict || "",
-      },
-      isPreOrderOrder: depositInfo.isPreOrderOrder,
-      depositDue: depositInfo.depositDue,
-      balanceDue: depositInfo.balanceDue,
-    });
-  } catch (emailError) {
-    console.error("Failed to send order confirmation email:", emailError);
-    // Don't throw - we don't want to fail the order if email fails
+    emailService
+      .sendOrderConfirmation({
+        customerEmail: orderData.email,
+        customerName: `${orderData.firstname} ${orderData.lastname || ""}`.trim(),
+        orderNumber: orderData.orderNumber,
+        trackingCode: orderData.trackingCode || "",
+        orderDate: new Date(
+          fullOrder?.createdAt || Date.now()
+        ).toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        }),
+        items: orderItems.map((item: any) => ({
+          productName: item.productName,
+          quantity: item.quantity,
+          price: item.productPrice,
+          subtotal: item.subtotal,
+          selectedColor: item.selectedColor,
+        })),
+        subtotal: orderData.subtotal || 0,
+        deliveryCharge: orderData.deliveryCharge || 0,
+        totalPayable: orderData.totalPayable || 0,
+        shippingAddress: {
+          fullName: `${orderData.firstname} ${orderData.lastname || ""}`.trim(),
+          phone: orderData.phone,
+          address: orderData.houseStreet,
+          city: orderData.city,
+          subdistrict: orderData.subdistrict || "",
+        },
+        isPreOrderOrder: depositInfo.isPreOrderOrder,
+        depositDue: depositInfo.depositDue,
+        balanceDue: depositInfo.balanceDue,
+      })
+      .catch((emailError) => {
+        console.error("Failed to send order confirmation email:", emailError);
+      });
+  } catch (err) {
+    console.error("Failed to dispatch order confirmation email process:", err);
   }
 
   return {

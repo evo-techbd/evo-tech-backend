@@ -62,6 +62,22 @@ const updateSalePaymentStatus = async (id, paymentStatus) => {
     const result = await printing_sale_model_1.PrintingSale.findByIdAndUpdate(id, { paymentStatus }, { new: true });
     return result;
 };
+const updateSale = async (id, payload) => {
+    let updateData = { ...payload };
+    // Recalculate prices if items are provided
+    if (payload.items && payload.items.length > 0) {
+        const items = payload.items.map((item) => ({
+            ...item,
+            price: item.unitPrice * item.quantity,
+        }));
+        const totalPrice = items.reduce((sum, item) => sum + item.price, 0);
+        updateData = { ...updateData, items, totalPrice };
+    }
+    const result = await printing_sale_model_1.PrintingSale.findByIdAndUpdate(id, updateData, {
+        new: true,
+    });
+    return result;
+};
 const deleteSale = async (id) => {
     const result = await printing_sale_model_1.PrintingSale.findByIdAndDelete(id);
     return result;
@@ -71,6 +87,7 @@ exports.PrintingSaleServices = {
     getAllSales,
     getSingleSale,
     updateSalePaymentStatus,
+    updateSale,
     deleteSale,
 };
 //# sourceMappingURL=printing-sale.service.js.map

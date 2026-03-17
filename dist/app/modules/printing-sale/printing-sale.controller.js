@@ -57,11 +57,21 @@ const deleteSale = (0, catchAsync_1.catchAsync)(async (req, res) => {
         data: null,
     });
 });
+const updateSale = (0, catchAsync_1.catchAsync)(async (req, res) => {
+    const result = await printing_sale_service_1.PrintingSaleServices.updateSale(req.params.id, req.body);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_1.default.OK,
+        message: "Printing sale updated successfully",
+        data: result,
+    });
+});
 exports.PrintingSaleControllers = {
     createSale,
     getAllSales,
     getSingleSale,
     updatePaymentStatus,
+    updateSale,
     deleteSale,
 };
 //# sourceMappingURL=printing-sale.controller.js.map

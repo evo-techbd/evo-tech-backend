@@ -11,6 +11,8 @@ router.get("/", auth(USER_ROLE.ADMIN), PrintingSaleControllers.getAllSales);
 
 router.get("/:id", auth(USER_ROLE.ADMIN), PrintingSaleControllers.getSingleSale);
 
+router.patch("/:id", auth(USER_ROLE.ADMIN), PrintingSaleControllers.updateSale);
+
 router.patch(
   "/:id/payment-status",
   auth(USER_ROLE.ADMIN),

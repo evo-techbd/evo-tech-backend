@@ -70,6 +70,11 @@ export declare const PrintingSaleServices: {
     }> & {
         __v: number;
     }) | null>;
+    updateSale: (id: string, payload: Partial<TPrintingSale>) => Promise<(import("mongoose").Document<unknown, {}, TPrintingSale, {}, {}> & TPrintingSale & Required<{
+        _id: string;
+    }> & {
+        __v: number;
+    }) | null>;
     deleteSale: (id: string) => Promise<(import("mongoose").Document<unknown, {}, TPrintingSale, {}, {}> & TPrintingSale & Required<{
         _id: string;
     }> & {

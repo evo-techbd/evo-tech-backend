@@ -603,11 +603,46 @@ const updateOrderStatusIntoDB = async (
     }
   }
 
-  // Calculate amountDue if amountPaid is provided
-  if (payload.amountPaid !== undefined) {
-    const totalPayable = payload.totalPayable || order.totalPayable;
-    const amountPaid = payload.amountPaid;
-    payload.amountDue = totalPayable - amountPaid;
+  const pricingFieldsUpdated =
+    payload.subtotal !== undefined ||
+    payload.discount !== undefined ||
+    payload.deliveryCharge !== undefined ||
+    payload.additionalCharge !== undefined;
+
+  if (pricingFieldsUpdated) {
+    const subtotal = payload.subtotal ?? order.subtotal ?? 0;
+    const discount = payload.discount ?? order.discount ?? 0;
+    const deliveryCharge = payload.deliveryCharge ?? order.deliveryCharge ?? 0;
+    const additionalCharge =
+      payload.additionalCharge ?? order.additionalCharge ?? 0;
+
+    payload.totalPayable = roundToTwo(
+      Math.max(subtotal - discount + deliveryCharge + additionalCharge, 0),
+    );
+
+    // Keep pre-order due fields consistent when payable changes.
+    if (order.isPreOrderOrder) {
+      const balanceDue = payload.balanceDue ?? order.balanceDue ?? 0;
+      payload.depositDue = roundToTwo(
+        Math.max((payload.totalPayable ?? 0) - balanceDue, 0),
+      );
+      payload.depositStatus =
+        (payload.depositPaid ?? order.depositPaid ?? 0) >=
+        (payload.depositDue ?? 0)
+          ? "paid"
+          : "pending";
+      payload.balanceStatus =
+        (payload.balancePaid ?? order.balancePaid ?? 0) >= balanceDue
+          ? "paid"
+          : "pending";
+    }
+  }
+
+  // Keep amountDue/paymentStatus in sync when financial fields change.
+  if (payload.amountPaid !== undefined || payload.totalPayable !== undefined) {
+    const totalPayable = payload.totalPayable ?? order.totalPayable ?? 0;
+    const amountPaid = payload.amountPaid ?? order.amountPaid ?? 0;
+    payload.amountDue = roundToTwo(Math.max(totalPayable - amountPaid, 0));
 
     // Only auto-calculate payment status if not explicitly provided
     // or if explicitly set to one of the auto-calculated statuses

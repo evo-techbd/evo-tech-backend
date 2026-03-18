@@ -214,6 +214,10 @@ const orderItemSchema = new mongoose_1.Schema({
         type: Number,
         required: true,
     },
+    buyingPrice: {
+        type: Number,
+        default: 0,
+    },
     quantity: {
         type: Number,
         required: true,

@@ -69,6 +69,7 @@ export interface TOrderItem {
   product: Types.ObjectId;
   productName: string;
   productPrice: number;
+  buyingPrice: number;
   quantity: number;
   selectedColor?: string;
   subtotal: number;

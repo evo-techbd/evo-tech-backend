@@ -5,5 +5,7 @@ export declare const DashboardControllers: {
     getTopProducts: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
     getEarningsReport: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
     getPendingOrdersCount: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    getMonthlyProfitBreakdown: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    getOrdersWithProfit: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
 };
 //# sourceMappingURL=dashboard.controller.d.ts.map

@@ -18,6 +18,10 @@ export declare const DashboardServices: {
             orderCount: number;
             printingSalesCount: number;
         };
+        excludedFees: {
+            deliveryFees: number;
+            additionalCharges: number;
+        };
         profitWarning: {
             message: string;
             itemsAffected: number;
@@ -79,6 +83,67 @@ export declare const DashboardServices: {
     }>;
     getPendingOrdersCount: () => Promise<{
         count: number;
+    }>;
+    getMonthlyProfitBreakdown: (year?: number) => Promise<{
+        year: number;
+        months: {
+            month: number;
+            monthName: string;
+            orders: number;
+            revenue: number;
+            cost: number;
+            profit: number;
+            deliveryFees: number;
+            additionalCharges: number;
+            printingRevenue: number;
+            printingOrders: number;
+        }[];
+        totals: {
+            orders: number;
+            revenue: number;
+            cost: number;
+            profit: number;
+            deliveryFees: number;
+            additionalCharges: number;
+            printingRevenue: number;
+            printingOrders: number;
+        };
+    }>;
+    getOrdersWithProfit: (year: number, month: number, page?: number, limit?: number) => Promise<{
+        orders: {
+            _id: string;
+            orderNumber: string;
+            customerName: string;
+            email: string;
+            phone: string;
+            orderDate: Date | undefined;
+            orderStatus: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
+            paymentStatus: "partial" | "pending" | "paid" | "failed" | "refunded";
+            revenue: number;
+            cost: number;
+            profit: number;
+            deliveryCharge: number;
+            additionalCharge: number;
+            discount: number;
+            amountPaid: number;
+            totalPayable: number;
+            itemCount: number;
+            items: {
+                productName: any;
+                sellingPrice: number;
+                buyingPrice: any;
+                quantity: any;
+                subtotal: number;
+                itemProfit: number;
+                selectedColor: any;
+            }[];
+        }[];
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+        };
     }>;
 };
 export {};

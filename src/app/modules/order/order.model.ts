@@ -219,6 +219,10 @@ const orderItemSchema = new Schema<TOrderItem>(
       type: Number,
       required: true,
     },
+    buyingPrice: {
+      type: Number,
+      default: 0,
+    },
     quantity: {
       type: Number,
       required: true,

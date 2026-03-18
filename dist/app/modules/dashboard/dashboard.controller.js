@@ -8,6 +8,12 @@ const http_status_1 = __importDefault(require("http-status"));
 const sendResponse_1 = __importDefault(require("../../utils/sendResponse"));
 const catchAsync_1 = require("../../utils/catchAsync");
 const dashboard_service_1 = require("./dashboard.service");
+const parseLimit = (value, defaultLimit = 5, maxLimit = 50) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed <= 0)
+        return defaultLimit;
+    return Math.min(Math.floor(parsed), maxLimit);
+};
 const getDashboardStats = (0, catchAsync_1.catchAsync)(async (req, res) => {
     const { range } = req.query;
     const result = await dashboard_service_1.DashboardServices.getDashboardStats(range);
@@ -30,7 +36,7 @@ const getSalesData = (0, catchAsync_1.catchAsync)(async (req, res) => {
 });
 const getRecentOrders = (0, catchAsync_1.catchAsync)(async (req, res) => {
     const { limit } = req.query;
-    const result = await dashboard_service_1.DashboardServices.getRecentOrders(Number(limit) || 10);
+    const result = await dashboard_service_1.DashboardServices.getRecentOrders(parseLimit(limit));
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.OK,
         success: true,
@@ -40,7 +46,7 @@ const getRecentOrders = (0, catchAsync_1.catchAsync)(async (req, res) => {
 });
 const getTopProducts = (0, catchAsync_1.catchAsync)(async (req, res) => {
     const { limit } = req.query;
-    const result = await dashboard_service_1.DashboardServices.getTopProducts(Number(limit) || 10);
+    const result = await dashboard_service_1.DashboardServices.getTopProducts(parseLimit(limit));
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.OK,
         success: true,
@@ -66,6 +72,26 @@ const getPendingOrdersCount = (0, catchAsync_1.catchAsync)(async (req, res) => {
         data: result,
     });
 });
+const getMonthlyProfitBreakdown = (0, catchAsync_1.catchAsync)(async (req, res) => {
+    const { year } = req.query;
+    const result = await dashboard_service_1.DashboardServices.getMonthlyProfitBreakdown(year ? Number(year) : undefined);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Monthly profit breakdown retrieved successfully!",
+        data: result,
+    });
+});
+const getOrdersWithProfit = (0, catchAsync_1.catchAsync)(async (req, res) => {
+    const { year, month, page, limit } = req.query;
+    const result = await dashboard_service_1.DashboardServices.getOrdersWithProfit(Number(year) || new Date().getFullYear(), Number(month) || new Date().getMonth() + 1, Number(page) || 1, Number(limit) || 50);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Orders with profit retrieved successfully!",
+        data: result,
+    });
+});
 exports.DashboardControllers = {
     getDashboardStats,
     getSalesData,
@@ -73,5 +99,7 @@ exports.DashboardControllers = {
     getTopProducts,
     getEarningsReport,
     getPendingOrdersCount,
+    getMonthlyProfitBreakdown,
+    getOrdersWithProfit,
 };
 //# sourceMappingURL=dashboard.controller.js.map

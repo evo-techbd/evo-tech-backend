@@ -160,13 +160,13 @@ const getDashboardStats = async (range: DateRange = "this-month") => {
     }
   });
 
-  // --- Regular order revenue ---
+  // --- Regular order revenue (subtotal - discount, excludes delivery & additional charges) ---
   const currentOrderRevenue = currentPeriodOrders.reduce(
-    (sum, order) => sum + (order.amountPaid || 0),
+    (sum, order) => sum + ((order.subtotal || 0) - (order.discount || 0)),
     0,
   );
   const previousOrderRevenue = previousPeriodOrders.reduce(
-    (sum, order) => sum + (order.amountPaid || 0),
+    (sum, order) => sum + ((order.subtotal || 0) - (order.discount || 0)),
     0,
   );
 
@@ -184,7 +184,7 @@ const getDashboardStats = async (range: DateRange = "this-month") => {
   const currentPeriodRevenue = currentOrderRevenue + currentPrintingRevenue;
   const previousPeriodRevenue = previousOrderRevenue + previousPrintingRevenue;
 
-  // --- Order cost calculation ---
+  // --- Order cost calculation (uses stored buyingPrice on OrderItem, falls back to Product) ---
   const currentPeriodOrderIds = currentPeriodOrders.map((order) => order._id);
   const currentPeriodOrderItems = await OrderItem.find({
     order: { $in: currentPeriodOrderIds },
@@ -194,23 +194,20 @@ const getDashboardStats = async (range: DateRange = "this-month") => {
   let itemsWithoutBuyingPrice = 0;
 
   for (const item of currentPeriodOrderItems) {
-    let product = item.product as any;
-
-    if (!product) {
-      const productByName = await Product.findOne({ name: item.productName });
-      if (productByName) {
-        product = productByName;
+    const itemAny = item as any;
+    // Prefer stored buyingPrice on OrderItem; fall back to populated product
+    let buyingPrice = itemAny.buyingPrice;
+    if (!buyingPrice || buyingPrice === 0) {
+      let product = item.product as any;
+      if (!product) {
+        product = await Product.findOne({ name: item.productName });
+      }
+      buyingPrice = product?.buyingPrice || 0;
+      if (!buyingPrice) {
+        itemsWithoutBuyingPrice++;
       }
     }
-
-    const buyingPrice = product?.buyingPrice || 0;
-    const quantity = item.quantity;
-    const itemCost = buyingPrice * quantity;
-
-    if (!product?.buyingPrice) {
-      itemsWithoutBuyingPrice++;
-    }
-    totalCost += itemCost;
+    totalCost += buyingPrice * item.quantity;
   }
 
   // Printing sales are custom — 100% profit (no buying cost)
@@ -224,15 +221,16 @@ const getDashboardStats = async (range: DateRange = "this-month") => {
 
   let previousPeriodCost = 0;
   for (const item of previousPeriodOrderItems) {
-    let product = item.product as any;
-
-    if (!product) {
-      product = await Product.findOne({ name: item.productName });
+    const itemAny = item as any;
+    let buyingPrice = itemAny.buyingPrice;
+    if (!buyingPrice || buyingPrice === 0) {
+      let product = item.product as any;
+      if (!product) {
+        product = await Product.findOne({ name: item.productName });
+      }
+      buyingPrice = product?.buyingPrice || 0;
     }
-
-    const buyingPrice = product?.buyingPrice || 0;
-    const itemCost = buyingPrice * item.quantity;
-    previousPeriodCost += itemCost;
+    previousPeriodCost += buyingPrice * item.quantity;
   }
 
   const previousPeriodProfit = previousPeriodRevenue - previousPeriodCost;
@@ -294,6 +292,16 @@ const getDashboardStats = async (range: DateRange = "this-month") => {
         100
       : 0;
 
+  // Delivery fees collected (for reference)
+  const currentDeliveryFees = currentPeriodOrders.reduce(
+    (sum, order) => sum + (order.deliveryCharge || 0),
+    0,
+  );
+  const currentAdditionalCharges = currentPeriodOrders.reduce(
+    (sum, order) => sum + (order.additionalCharge || 0),
+    0,
+  );
+
   return {
     totalRevenue: currentPeriodRevenue,
     totalProfit: totalProfit,
@@ -312,6 +320,11 @@ const getDashboardStats = async (range: DateRange = "this-month") => {
       printingRevenue: currentPrintingRevenue,
       orderCount: currentPeriodOrders.length,
       printingSalesCount: currentPrintingSales.length,
+    },
+    // Excluded fees (for transparency)
+    excludedFees: {
+      deliveryFees: currentDeliveryFees,
+      additionalCharges: currentAdditionalCharges,
     },
     profitWarning:
       itemsWithoutBuyingPrice > 0
@@ -384,7 +397,16 @@ const getSalesData = async (period: string = "30d") => {
   ]);
 
   // Merge both datasets by date
-  const mergedMap = new Map<string, { date: string; sales: number; orders: number; orderSales: number; printingSales: number }>();
+  const mergedMap = new Map<
+    string,
+    {
+      date: string;
+      sales: number;
+      orders: number;
+      orderSales: number;
+      printingSales: number;
+    }
+  >();
 
   for (const item of orderSalesData) {
     mergedMap.set(item._id, {
@@ -421,7 +443,7 @@ const getSalesData = async (period: string = "30d") => {
   return salesData;
 };
 
-const getRecentOrders = async (limit: number = 10) => {
+const getRecentOrders = async (limit: number = 5) => {
   // Get all orders and sort: pending first, then by creation date
   const orders = await Order.find()
     .sort({ createdAt: -1 })
@@ -461,7 +483,7 @@ const getRecentOrders = async (limit: number = 10) => {
   }));
 };
 
-const getTopProducts = async (limit: number = 10) => {
+const getTopProducts = async (limit: number = 5) => {
   // This would require order items collection to get actual sales data
   // For now, we'll return products sorted by creation date as a placeholder
   const products = await Product.find({ published: true })
@@ -510,47 +532,120 @@ const getEarningsReport = async () => {
     printingYearlyBreakdown,
   ] = await Promise.all([
     Order.find({ orderStatus: { $ne: "cancelled" } }),
-    Order.find({ createdAt: { $gte: startOfYear, $lte: now }, orderStatus: { $ne: "cancelled" } }),
-    Order.find({ createdAt: { $gte: startOfMonth, $lte: now }, orderStatus: { $ne: "cancelled" } }),
-    Order.find({ createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth }, orderStatus: { $ne: "cancelled" } }),
-    Order.find({ createdAt: { $gte: startOfLastYear, $lte: endOfLastYear }, orderStatus: { $ne: "cancelled" } }),
+    Order.find({
+      createdAt: { $gte: startOfYear, $lte: now },
+      orderStatus: { $ne: "cancelled" },
+    }),
+    Order.find({
+      createdAt: { $gte: startOfMonth, $lte: now },
+      orderStatus: { $ne: "cancelled" },
+    }),
+    Order.find({
+      createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+      orderStatus: { $ne: "cancelled" },
+    }),
+    Order.find({
+      createdAt: { $gte: startOfLastYear, $lte: endOfLastYear },
+      orderStatus: { $ne: "cancelled" },
+    }),
     PrintingSale.find({ paymentStatus: "paid" }),
-    PrintingSale.find({ createdAt: { $gte: startOfYear, $lte: now }, paymentStatus: "paid" }),
-    PrintingSale.find({ createdAt: { $gte: startOfMonth, $lte: now }, paymentStatus: "paid" }),
-    PrintingSale.find({ createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth }, paymentStatus: "paid" }),
-    PrintingSale.find({ createdAt: { $gte: startOfLastYear, $lte: endOfLastYear }, paymentStatus: "paid" }),
+    PrintingSale.find({
+      createdAt: { $gte: startOfYear, $lte: now },
+      paymentStatus: "paid",
+    }),
+    PrintingSale.find({
+      createdAt: { $gte: startOfMonth, $lte: now },
+      paymentStatus: "paid",
+    }),
+    PrintingSale.find({
+      createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+      paymentStatus: "paid",
+    }),
+    PrintingSale.find({
+      createdAt: { $gte: startOfLastYear, $lte: endOfLastYear },
+      paymentStatus: "paid",
+    }),
     // Monthly breakdown aggregations
     Order.aggregate([
-      { $match: { createdAt: { $gte: startOfYear, $lte: now }, orderStatus: { $ne: "cancelled" } } },
-      { $group: { _id: { $month: "$createdAt" }, earnings: { $sum: "$amountPaid" }, orders: { $sum: 1 } } },
+      {
+        $match: {
+          createdAt: { $gte: startOfYear, $lte: now },
+          orderStatus: { $ne: "cancelled" },
+        },
+      },
+      {
+        $group: {
+          _id: { $month: "$createdAt" },
+          earnings: { $sum: "$amountPaid" },
+          orders: { $sum: 1 },
+        },
+      },
       { $sort: { _id: 1 } },
     ]),
     Order.aggregate([
-      { $match: { createdAt: { $gte: fiveYearsAgo, $lte: now }, orderStatus: { $ne: "cancelled" } } },
-      { $group: { _id: { $year: "$createdAt" }, earnings: { $sum: "$amountPaid" }, orders: { $sum: 1 } } },
+      {
+        $match: {
+          createdAt: { $gte: fiveYearsAgo, $lte: now },
+          orderStatus: { $ne: "cancelled" },
+        },
+      },
+      {
+        $group: {
+          _id: { $year: "$createdAt" },
+          earnings: { $sum: "$amountPaid" },
+          orders: { $sum: 1 },
+        },
+      },
       { $sort: { _id: 1 } },
     ]),
     PrintingSale.aggregate([
-      { $match: { createdAt: { $gte: startOfYear, $lte: now }, paymentStatus: "paid" } },
-      { $group: { _id: { $month: "$createdAt" }, earnings: { $sum: "$totalPrice" }, orders: { $sum: 1 } } },
+      {
+        $match: {
+          createdAt: { $gte: startOfYear, $lte: now },
+          paymentStatus: "paid",
+        },
+      },
+      {
+        $group: {
+          _id: { $month: "$createdAt" },
+          earnings: { $sum: "$totalPrice" },
+          orders: { $sum: 1 },
+        },
+      },
       { $sort: { _id: 1 } },
     ]),
     PrintingSale.aggregate([
-      { $match: { createdAt: { $gte: fiveYearsAgo, $lte: now }, paymentStatus: "paid" } },
-      { $group: { _id: { $year: "$createdAt" }, earnings: { $sum: "$totalPrice" }, orders: { $sum: 1 } } },
+      {
+        $match: {
+          createdAt: { $gte: fiveYearsAgo, $lte: now },
+          paymentStatus: "paid",
+        },
+      },
+      {
+        $group: {
+          _id: { $year: "$createdAt" },
+          earnings: { $sum: "$totalPrice" },
+          orders: { $sum: 1 },
+        },
+      },
       { $sort: { _id: 1 } },
     ]),
   ]);
 
   // Helper to sum revenue
-  const sumOrders = (orders: any[]) => orders.reduce((s, o) => s + (o.amountPaid || 0), 0);
-  const sumPrinting = (sales: any[]) => sales.reduce((s, p) => s + (p.totalPrice || 0), 0);
+  const sumOrders = (orders: any[]) =>
+    orders.reduce((s, o) => s + (o.amountPaid || 0), 0);
+  const sumPrinting = (sales: any[]) =>
+    sales.reduce((s, p) => s + (p.totalPrice || 0), 0);
 
   const totalEarnings = sumOrders(allOrders) + sumPrinting(allPrintingSales);
   const yearlyEarnings = sumOrders(yearOrders) + sumPrinting(yearPrintingSales);
-  const monthlyEarnings = sumOrders(monthOrders) + sumPrinting(monthPrintingSales);
-  const lastMonthEarnings = sumOrders(lastMonthOrders) + sumPrinting(lastMonthPrintingSales);
-  const lastYearEarnings = sumOrders(lastYearOrders) + sumPrinting(lastYearPrintingSales);
+  const monthlyEarnings =
+    sumOrders(monthOrders) + sumPrinting(monthPrintingSales);
+  const lastMonthEarnings =
+    sumOrders(lastMonthOrders) + sumPrinting(lastMonthPrintingSales);
+  const lastYearEarnings =
+    sumOrders(lastYearOrders) + sumPrinting(lastYearPrintingSales);
 
   const totalCount = allOrders.length + allPrintingSales.length;
   const yearCount = yearOrders.length + yearPrintingSales.length;
@@ -567,10 +662,17 @@ const getEarningsReport = async () => {
       : 0;
 
   // Merge monthly breakdowns
-  const mergeBreakdown = (orderData: any[], printingData: any[], key: string) => {
+  const mergeBreakdown = (
+    orderData: any[],
+    printingData: any[],
+    key: string,
+  ) => {
     const map = new Map<number, { earnings: number; orders: number }>();
     for (const item of orderData) {
-      map.set(item._id, { earnings: item.earnings || 0, orders: item.orders || 0 });
+      map.set(item._id, {
+        earnings: item.earnings || 0,
+        orders: item.orders || 0,
+      });
     }
     for (const item of printingData) {
       const existing = map.get(item._id);
@@ -578,12 +680,19 @@ const getEarningsReport = async () => {
         existing.earnings += item.earnings || 0;
         existing.orders += item.orders || 0;
       } else {
-        map.set(item._id, { earnings: item.earnings || 0, orders: item.orders || 0 });
+        map.set(item._id, {
+          earnings: item.earnings || 0,
+          orders: item.orders || 0,
+        });
       }
     }
     return Array.from(map.entries())
       .sort(([a], [b]) => a - b)
-      .map(([id, data]) => ({ [key]: id, earnings: data.earnings, orders: data.orders }));
+      .map(([id, data]) => ({
+        [key]: id,
+        earnings: data.earnings,
+        orders: data.orders,
+      }));
   };
 
   return {
@@ -595,13 +704,21 @@ const getEarningsReport = async () => {
       earnings: yearlyEarnings,
       orders: yearCount,
       growth: Math.round(yearlyGrowth * 100) / 100,
-      breakdown: mergeBreakdown(orderYearlyBreakdown, printingYearlyBreakdown, "year"),
+      breakdown: mergeBreakdown(
+        orderYearlyBreakdown,
+        printingYearlyBreakdown,
+        "year",
+      ),
     },
     monthly: {
       earnings: monthlyEarnings,
       orders: monthCount,
       growth: Math.round(monthlyGrowth * 100) / 100,
-      breakdown: mergeBreakdown(orderMonthlyBreakdown, printingMonthlyBreakdown, "month"),
+      breakdown: mergeBreakdown(
+        orderMonthlyBreakdown,
+        printingMonthlyBreakdown,
+        "month",
+      ),
     },
     avgOrderValue: totalCount > 0 ? totalEarnings / totalCount : 0,
   };
@@ -618,6 +735,271 @@ const getPendingOrdersCount = async () => {
   };
 };
 
+const getMonthlyProfitBreakdown = async (year?: number) => {
+  const targetYear = year || new Date().getFullYear();
+  const startOfYear = new Date(targetYear, 0, 1);
+  const endOfYear = new Date(targetYear, 11, 31, 23, 59, 59, 999);
+
+  // Get all non-cancelled orders for the year
+  const orders = await Order.find({
+    createdAt: { $gte: startOfYear, $lte: endOfYear },
+    orderStatus: { $ne: "cancelled" },
+  }).lean();
+
+  // Get all order items for these orders with product populated (for fallback buyingPrice)
+  const orderIds = orders.map((o) => o._id);
+  const orderItems = await OrderItem.find({
+    order: { $in: orderIds },
+  })
+    .populate("product")
+    .lean();
+
+  // Get 3D printing sales for the year
+  const printingSales = await PrintingSale.find({
+    createdAt: { $gte: startOfYear, $lte: endOfYear },
+    paymentStatus: "paid",
+  }).lean();
+
+  // Build a map of orderId -> order for quick lookup
+  const orderMap = new Map(orders.map((o) => [o._id.toString(), o]));
+
+  // Build a map of orderId -> orderItems[]
+  const orderItemsMap = new Map<string, any[]>();
+  for (const item of orderItems) {
+    const key = item.order.toString();
+    if (!orderItemsMap.has(key)) {
+      orderItemsMap.set(key, []);
+    }
+    orderItemsMap.get(key)!.push(item);
+  }
+
+  // Initialize 12 months
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+
+  const months = monthNames.map((name, index) => ({
+    month: index + 1,
+    monthName: name,
+    orders: 0,
+    revenue: 0,
+    cost: 0,
+    profit: 0,
+    deliveryFees: 0,
+    additionalCharges: 0,
+    printingRevenue: 0,
+    printingOrders: 0,
+  }));
+
+  // Process store orders
+  for (const order of orders) {
+    const monthIndex = new Date(order.createdAt!).getMonth();
+    const m = months[monthIndex];
+    m.orders += 1;
+    // Revenue = subtotal - discount (excludes delivery & additional charges)
+    const orderRevenue = (order.subtotal || 0) - (order.discount || 0);
+    m.revenue += orderRevenue;
+    m.deliveryFees += order.deliveryCharge || 0;
+    m.additionalCharges += order.additionalCharge || 0;
+
+    // Calculate cost from order items
+    const items = orderItemsMap.get(order._id.toString()) || [];
+    for (const item of items) {
+      // Prefer stored buyingPrice, fall back to product
+      let buyingPrice = item.buyingPrice;
+      if (!buyingPrice || buyingPrice === 0) {
+        const product = item.product as any;
+        buyingPrice = product?.buyingPrice || 0;
+      }
+      m.cost += buyingPrice * item.quantity;
+    }
+  }
+
+  // Process 3D printing sales
+  for (const sale of printingSales) {
+    const monthIndex = new Date(sale.createdAt!).getMonth();
+    const m = months[monthIndex];
+    m.printingOrders += 1;
+    m.printingRevenue += sale.totalPrice || 0;
+    // Printing revenue is 100% profit (no cost of goods)
+  }
+
+  // Calculate profit for each month
+  for (const m of months) {
+    const totalMonthRevenue = m.revenue + m.printingRevenue;
+    m.profit = totalMonthRevenue - m.cost;
+  }
+
+  // Totals
+  const totals = months.reduce(
+    (acc, m) => ({
+      orders: acc.orders + m.orders,
+      revenue: acc.revenue + m.revenue,
+      cost: acc.cost + m.cost,
+      profit: acc.profit + m.profit,
+      deliveryFees: acc.deliveryFees + m.deliveryFees,
+      additionalCharges: acc.additionalCharges + m.additionalCharges,
+      printingRevenue: acc.printingRevenue + m.printingRevenue,
+      printingOrders: acc.printingOrders + m.printingOrders,
+    }),
+    {
+      orders: 0,
+      revenue: 0,
+      cost: 0,
+      profit: 0,
+      deliveryFees: 0,
+      additionalCharges: 0,
+      printingRevenue: 0,
+      printingOrders: 0,
+    },
+  );
+
+  return {
+    year: targetYear,
+    months,
+    totals,
+  };
+};
+
+const getOrdersWithProfit = async (
+  year: number,
+  month: number,
+  page: number = 1,
+  limit: number = 50,
+) => {
+  const startOfMonth = new Date(year, month - 1, 1);
+  const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
+
+  const skip = (page - 1) * limit;
+
+  const [orders, total] = await Promise.all([
+    Order.find({
+      createdAt: { $gte: startOfMonth, $lte: endOfMonth },
+      orderStatus: { $ne: "cancelled" },
+    })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    Order.countDocuments({
+      createdAt: { $gte: startOfMonth, $lte: endOfMonth },
+      orderStatus: { $ne: "cancelled" },
+    }),
+  ]);
+
+  if (orders.length === 0) {
+    return {
+      orders: [],
+      meta: { page, limit, total: 0, totalPages: 0 },
+    };
+  }
+
+  // Get order items for all orders in one query
+  const orderIds = orders.map((o) => o._id);
+  const orderItems = await OrderItem.find({
+    order: { $in: orderIds },
+  })
+    .populate("product", "name buyingPrice mainImage")
+    .lean();
+
+  // Group items by orderId
+  const itemsByOrder = new Map<string, any[]>();
+  for (const item of orderItems) {
+    const key = item.order.toString();
+    if (!itemsByOrder.has(key)) {
+      itemsByOrder.set(key, []);
+    }
+    itemsByOrder.get(key)!.push(item);
+  }
+
+  // Build result
+  const result = orders.map((order) => {
+    const items = itemsByOrder.get(order._id.toString()) || [];
+
+    // Revenue = subtotal - discount (excludes delivery & additional charges)
+    const revenue = (order.subtotal || 0) - (order.discount || 0);
+
+    // Calculate ratio to make item subtotals match actual order revenue (handles pre-order prices, etc.)
+    const itemSubtotalSum = items.reduce(
+      (sum, i) => sum + (i.subtotal || 0),
+      0,
+    );
+    const ratio = itemSubtotalSum > 0 ? revenue / itemSubtotalSum : 1;
+
+    // Cost = sum of buyingPrice * quantity for each item
+    let cost = 0;
+    const itemDetails = items.map((item: any) => {
+      let buyingPrice = item.buyingPrice || 0;
+      if (!buyingPrice) {
+        const product = item.product as any;
+        buyingPrice = product?.buyingPrice || 0;
+      }
+      const itemCost = buyingPrice * item.quantity;
+      cost += itemCost;
+
+      // Scale selling price and item subtotal by the ratio of actual revenue
+      const adjustedSubtotal = (item.subtotal || 0) * ratio;
+      const adjustedSellingPrice = (item.productPrice || 0) * ratio;
+
+      return {
+        productName: item.productName,
+        sellingPrice: adjustedSellingPrice,
+        buyingPrice: buyingPrice,
+        quantity: item.quantity,
+        subtotal: adjustedSubtotal,
+        itemProfit: adjustedSubtotal - itemCost,
+        selectedColor: item.selectedColor,
+      };
+    });
+
+    const profit = revenue - cost;
+    const customerName =
+      `${order.firstname || ""} ${order.lastname || ""}`.trim() || "Unknown";
+
+    return {
+      _id: order._id,
+      orderNumber: order.orderNumber,
+      customerName,
+      email: order.email,
+      phone: order.phone,
+      orderDate: order.createdAt,
+      orderStatus: order.orderStatus,
+      paymentStatus: order.paymentStatus,
+      revenue,
+      cost,
+      profit,
+      deliveryCharge: order.deliveryCharge || 0,
+      additionalCharge: order.additionalCharge || 0,
+      discount: order.discount || 0,
+      amountPaid: order.amountPaid || 0,
+      totalPayable: order.totalPayable || 0,
+      itemCount: items.length,
+      items: itemDetails,
+    };
+  });
+
+  return {
+    orders: result,
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+};
+
 export const DashboardServices = {
   getDashboardStats,
   getSalesData,
@@ -625,4 +1007,6 @@ export const DashboardServices = {
   getTopProducts,
   getEarningsReport,
   getPendingOrdersCount,
+  getMonthlyProfitBreakdown,
+  getOrdersWithProfit,
 };

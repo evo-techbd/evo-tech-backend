@@ -42,4 +42,16 @@ router.get(
   DashboardControllers.getPendingOrdersCount
 );
 
+router.get(
+  "/monthly-profit-breakdown",
+  auth(USER_ROLE.ADMIN, USER_ROLE.EMPLOYEE),
+  DashboardControllers.getMonthlyProfitBreakdown
+);
+
+router.get(
+  "/orders-with-profit",
+  auth(USER_ROLE.ADMIN, USER_ROLE.EMPLOYEE),
+  DashboardControllers.getOrdersWithProfit
+);
+
 export const DashboardRoutes = router;

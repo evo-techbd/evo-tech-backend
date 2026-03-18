@@ -16,5 +16,7 @@ router.get("/recent-orders", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN
 router.get("/top-products", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN, user_constant_1.USER_ROLE.EMPLOYEE), dashboard_controller_1.DashboardControllers.getTopProducts);
 router.get("/earnings-report", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN, user_constant_1.USER_ROLE.EMPLOYEE), dashboard_controller_1.DashboardControllers.getEarningsReport);
 router.get("/pending-orders-count", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN, user_constant_1.USER_ROLE.EMPLOYEE), dashboard_controller_1.DashboardControllers.getPendingOrdersCount);
+router.get("/monthly-profit-breakdown", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN, user_constant_1.USER_ROLE.EMPLOYEE), dashboard_controller_1.DashboardControllers.getMonthlyProfitBreakdown);
+router.get("/orders-with-profit", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN, user_constant_1.USER_ROLE.EMPLOYEE), dashboard_controller_1.DashboardControllers.getOrdersWithProfit);
 exports.DashboardRoutes = router;
 //# sourceMappingURL=dashboard.route.js.map

@@ -178,6 +178,39 @@ const calculateDepositBreakdown = (
   };
 };
 
+const VALID_PAYMENT_METHODS = ["cod", "cop", "bkash", "bank_transfer"];
+const CASH_PAYMENT_METHODS = ["cod", "cop"];
+// Letters/digits/hyphen/slash, 6-25 chars, no spaces, must contain at least one digit.
+// Blocks junk like "AmiPorepayKorbo" while still accepting real bKash/bank references.
+const TRANSACTION_ID_REGEX = /^(?=.*\d)[A-Za-z0-9\-/]{6,25}$/;
+
+const validateOrderPayment = (
+  paymentMethod: string,
+  transactionId: string | undefined,
+  isPreOrderOrder: boolean,
+) => {
+  if (!VALID_PAYMENT_METHODS.includes(paymentMethod)) {
+    throw new AppError(httpStatus.BAD_REQUEST, "Invalid payment method");
+  }
+
+  if (isPreOrderOrder && CASH_PAYMENT_METHODS.includes(paymentMethod)) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "Cash on Delivery/Pickup is not available for Group Buy items. Please pay via bKash or Bank Transfer.",
+    );
+  }
+
+  if (!CASH_PAYMENT_METHODS.includes(paymentMethod)) {
+    const trimmedId = (transactionId || "").trim();
+    if (!trimmedId || !TRANSACTION_ID_REGEX.test(trimmedId)) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        "Please provide a valid payment transaction ID.",
+      );
+    }
+  }
+};
+
 const placeOrderIntoDB = async (
   payload: TOrder & { items: any[] },
   userUuid: string,
@@ -239,6 +272,12 @@ const placeOrderIntoDB = async (
   const depositInfo = calculateDepositBreakdown(
     productDetails,
     orderData.totalPayable || 0,
+  );
+
+  validateOrderPayment(
+    orderData.paymentMethod,
+    orderData.transactionId,
+    depositInfo.isPreOrderOrder,
   );
 
   Object.assign(orderData, depositInfo, {
@@ -768,6 +807,12 @@ const placeGuestOrderIntoDB = async (payload: TOrder & { items: any[] }) => {
   const depositInfo = calculateDepositBreakdown(
     productDetails,
     orderData.totalPayable || 0,
+  );
+
+  validateOrderPayment(
+    orderData.paymentMethod,
+    orderData.transactionId,
+    depositInfo.isPreOrderOrder,
   );
 
   Object.assign(orderData, depositInfo, {

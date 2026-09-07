@@ -43,9 +43,9 @@ export const orderConfirmationTemplate = (data: OrderEmailData): string => {
 
   const preOrderNotice = data.isPreOrderOrder ? `
     <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin: 24px 0; border-radius: 4px;">
-      <h3 style="color: #92400e; margin: 0 0 8px 0; font-size: 16px;">📦 Pre-Order Information</h3>
+      <h3 style="color: #92400e; margin: 0 0 8px 0; font-size: 16px;">📦 Group Buy Information</h3>
       <p style="color: #78350f; margin: 0; font-size: 14px; line-height: 1.6;">
-        This order contains pre-order items. 
+        This order contains Group Buy items.
         ${data.depositDue ? `<br><strong>Deposit to pay now:</strong> ${formatCurrency(data.depositDue)}` : ''}
         ${data.balanceDue ? `<br><strong>Balance due on delivery:</strong> ${formatCurrency(data.balanceDue)}` : ''}
       </p>

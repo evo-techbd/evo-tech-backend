@@ -26,6 +26,7 @@ import { FaqRoutes } from "../modules/faq/faq.route";
 import { PickupPointRoutes } from "../modules/pickuppoint/pickuppoint.route";
 import { TrashRoutes } from "../modules/trash/trash.route";
 import { PrintingSaleRoutes } from "../modules/printing-sale/printing-sale.route";
+import { SettingsRoutes } from "../modules/settings/settings.route";
 
 const router = express.Router();
 const adminRouter = express.Router();
@@ -146,6 +147,10 @@ const moduleRoutes = [
   {
     path: "/trash",
     route: TrashRoutes,
+  },
+  {
+    path: "/settings",
+    route: SettingsRoutes,
   },
   {
     path: "/admin",

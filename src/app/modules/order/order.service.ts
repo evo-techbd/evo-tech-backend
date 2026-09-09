@@ -9,6 +9,7 @@ import { NotificationServices } from "../notification/notification.service";
 import { emailService } from "../../utils/emailService";
 import { Review } from "../review/review.model";
 import { PickupPoint } from "../pickuppoint/pickuppoint.model";
+import { SettingsService } from "../settings/settings.service";
 
 const generateOrderNumber = (): string => {
   const timestamp = Date.now().toString();
@@ -135,6 +136,40 @@ interface DepositBreakdown {
 }
 
 const roundToTwo = (value: number) => Math.round(value * 100) / 100;
+
+// Mirrors frontend/utils/essential_functions.ts#getAdditionalChargeforWeight,
+// but reads the tiered charges from admin-configurable settings instead of
+// hardcoded constants, and is the authoritative value saved on the order
+// (the client-submitted deliveryCharge is only used for display/estimation).
+const resolveDeliveryCharge = async (
+  shippingType: string | undefined,
+  city: string | undefined,
+  productDetails: Array<{ product: any; quantity: number }>,
+) => {
+  // Pickup and express delivery don't use the weight-based regular delivery charge
+  if (shippingType !== "regular_delivery") {
+    return 0;
+  }
+
+  const settings = await SettingsService.getDeliveryChargeSettingsFromDB();
+
+  const totalWeight = productDetails.reduce((acc, { product, quantity }) => {
+    const weight = Number(product?.weight) || 0;
+    return acc + weight * quantity;
+  }, 0);
+
+  const isInsideDhaka = (city || "").trim().toLowerCase() === "dhaka";
+  const baseCharge = isInsideDhaka
+    ? settings.insideDhakaCharge
+    : settings.outsideDhakaCharge;
+
+  if (totalWeight <= 1000) {
+    return Math.round(baseCharge);
+  }
+
+  const additionalKg = Math.ceil((totalWeight - 1000) / 1000);
+  return Math.round(baseCharge + additionalKg * settings.additionalChargePerKg);
+};
 
 const calculateDepositBreakdown = (
   productDetails: Array<{ product: any; quantity: number }>,
@@ -268,6 +303,23 @@ const placeOrderIntoDB = async (
   orderData.trackingCode = generateTrackingId();
   orderData.user = userUuid;
   orderData.isGuest = false;
+
+  // Recompute delivery charge server-side from admin-configured settings
+  // rather than trusting the client-submitted value
+  orderData.deliveryCharge = await resolveDeliveryCharge(
+    orderData.shippingType,
+    orderData.city,
+    productDetails,
+  );
+  orderData.totalPayable = roundToTwo(
+    Math.max(
+      (orderData.subtotal || 0) -
+        (orderData.discount || 0) +
+        orderData.deliveryCharge +
+        (orderData.additionalCharge || 0),
+      0,
+    ),
+  );
 
   const depositInfo = calculateDepositBreakdown(
     productDetails,
@@ -802,6 +854,23 @@ const placeGuestOrderIntoDB = async (payload: TOrder & { items: any[] }) => {
   orderData.trackingCode = generateTrackingId();
   orderData.isGuest = true;
   orderData.guestEmail = orderData.email;
+
+  // Recompute delivery charge server-side from admin-configured settings
+  // rather than trusting the client-submitted value
+  orderData.deliveryCharge = await resolveDeliveryCharge(
+    orderData.shippingType,
+    orderData.city,
+    productDetails,
+  );
+  orderData.totalPayable = roundToTwo(
+    Math.max(
+      (orderData.subtotal || 0) -
+        (orderData.discount || 0) +
+        orderData.deliveryCharge +
+        (orderData.additionalCharge || 0),
+      0,
+    ),
+  );
 
   // Compute deposit/balance data for guest orders
   const depositInfo = calculateDepositBreakdown(

@@ -9,5 +9,7 @@ export declare const OrderControllers: {
     deleteOrder: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
     trackOrder: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
     getOrderItemsForReview: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    getOrderArchiveSummary: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    getOrderArchiveYears: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
 };
 //# sourceMappingURL=order.controller.d.ts.map

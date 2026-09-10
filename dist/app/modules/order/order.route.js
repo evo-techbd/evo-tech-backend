@@ -17,6 +17,8 @@ router.post("/", (0, auth_1.default)(user_constant_1.USER_ROLE.USER, user_consta
 router.post("/link-guest-orders", (0, auth_1.default)(user_constant_1.USER_ROLE.USER, user_constant_1.USER_ROLE.ADMIN), order_controller_1.OrderControllers.linkGuestOrders);
 router.get("/my-orders", (0, auth_1.default)(user_constant_1.USER_ROLE.USER, user_constant_1.USER_ROLE.ADMIN), order_controller_1.OrderControllers.getUserOrders);
 router.get("/", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN, user_constant_1.USER_ROLE.EMPLOYEE), order_controller_1.OrderControllers.getAllOrders);
+router.get("/archive/summary", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN, user_constant_1.USER_ROLE.EMPLOYEE), order_controller_1.OrderControllers.getOrderArchiveSummary);
+router.get("/archive/years", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN, user_constant_1.USER_ROLE.EMPLOYEE), order_controller_1.OrderControllers.getOrderArchiveYears);
 router.get("/:id", (0, auth_1.default)(user_constant_1.USER_ROLE.USER, user_constant_1.USER_ROLE.ADMIN), order_controller_1.OrderControllers.getSingleOrder);
 router.get("/:id/items-for-review", (0, auth_1.default)(user_constant_1.USER_ROLE.USER, user_constant_1.USER_ROLE.ADMIN), order_controller_1.OrderControllers.getOrderItemsForReview);
 router.put("/:id", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN, user_constant_1.USER_ROLE.EMPLOYEE), order_controller_1.OrderControllers.updateOrderStatus);

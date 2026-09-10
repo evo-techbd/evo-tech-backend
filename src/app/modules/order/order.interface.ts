@@ -12,6 +12,12 @@ export interface TPickupPoint {
 export interface TOrder {
   _id?: string;
   orderNumber: string;
+  // Small, human-friendly number printed on invoices: MM + a 3-digit
+  // sequence that resets every calendar month (e.g. "09001", "09002",
+  // then "06001" the following June). Distinct from orderNumber, which is
+  // a long unique system reference. Not globally unique — the sequence
+  // resets monthly, so different months legitimately share small numbers.
+  invoiceSerial?: string;
   user?: string; // UUID - optional for guest orders
   guestEmail?: string; // Email for guest checkout - used to link orders when user registers
   isGuest?: boolean; // Flag to identify guest orders
@@ -61,6 +67,20 @@ export interface TOrder {
   deliveredAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
+}
+
+export interface TArchiveMonthSummary {
+  month: number; // 1-12
+  monthName: string;
+  orderCount: number;
+  totalAmountPaid: number;
+  totalPayable: number;
+}
+
+export interface TArchiveSummary {
+  year: number;
+  months: TArchiveMonthSummary[];
+  totals: { orderCount: number; totalAmountPaid: number; totalPayable: number };
 }
 
 export interface TOrderItem {

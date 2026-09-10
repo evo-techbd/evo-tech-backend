@@ -4,11 +4,18 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.app = void 0;
+const dns_1 = __importDefault(require("dns"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const app_1 = __importDefault(require("./app"));
 exports.app = app_1.default;
 const config_1 = __importDefault(require("./app/config"));
 const seeding_1 = require("./app/utils/seeding");
+// MongoDB Atlas connection strings (mongodb+srv://) require DNS SRV record
+// lookups. On some Windows machines/networks the default (router/ISP) DNS
+// resolver doesn't support SRV queries and the lookup fails with
+// "querySrv ECONNREFUSED". Pointing Node's resolver at public DNS servers
+// that do support SRV records fixes this before any connection is attempted.
+dns_1.default.setServers(["8.8.8.8", "8.8.4.4", "1.1.1.1"]);
 let server;
 process.on("uncaughtException", (error) => {
     console.error("Uncaught Exception:", error);

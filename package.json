@@ -20,7 +20,8 @@
     "list:collections": "ts-node-dev --transpile-only database/listCollections.ts",
     "diagnose:permissions": "ts-node-dev --transpile-only database/diagnosePermissions.ts",
     "test:permission-api": "ts-node-dev --transpile-only database/testPermissionAPI.ts",
-    "migrate:database": "ts-node-dev --transpile-only scripts/migrate-database.ts"
+    "migrate:database": "ts-node-dev --transpile-only scripts/migrate-database.ts",
+    "migrate:invoice-serial": "ts-node-dev --transpile-only database/migrations/backfillInvoiceSerial.ts"
   },
   "keywords": [
     "express",

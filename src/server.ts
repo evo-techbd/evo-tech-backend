@@ -1,8 +1,16 @@
+import dns from "dns";
 import { Server } from "http";
 import mongoose from "mongoose";
 import app from "./app";
 import config from "./app/config";
 import { seedAdmin } from "./app/utils/seeding";
+
+// MongoDB Atlas connection strings (mongodb+srv://) require DNS SRV record
+// lookups. On some Windows machines/networks the default (router/ISP) DNS
+// resolver doesn't support SRV queries and the lookup fails with
+// "querySrv ECONNREFUSED". Pointing Node's resolver at public DNS servers
+// that do support SRV records fixes this before any connection is attempted.
+dns.setServers(["8.8.8.8", "8.8.4.4", "1.1.1.1"]);
 
 let server: Server;
 

@@ -32,6 +32,16 @@ router.get(
   OrderControllers.getAllOrders
 );
 router.get(
+  "/archive/summary",
+  auth(USER_ROLE.ADMIN, USER_ROLE.EMPLOYEE),
+  OrderControllers.getOrderArchiveSummary
+);
+router.get(
+  "/archive/years",
+  auth(USER_ROLE.ADMIN, USER_ROLE.EMPLOYEE),
+  OrderControllers.getOrderArchiveYears
+);
+router.get(
   "/:id",
   auth(USER_ROLE.USER, USER_ROLE.ADMIN),
   OrderControllers.getSingleOrder

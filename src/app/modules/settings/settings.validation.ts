@@ -16,6 +16,18 @@ const updateDeliveryChargeValidationSchema = z.object({
       })
       .min(0, "Additional charge per kg cannot be negative")
       .optional(),
+    expressInsideDhakaCharge: z
+      .number({
+        invalid_type_error: "Express delivery charge must be a number",
+      })
+      .min(0, "Express delivery charge cannot be negative")
+      .optional(),
+    expressOutsideDhakaCharge: z
+      .number({
+        invalid_type_error: "Express delivery charge must be a number",
+      })
+      .min(0, "Express delivery charge cannot be negative")
+      .optional(),
   }),
 });
 

@@ -1,5 +1,10 @@
 import { Order, OrderItem } from "./order.model";
-import { TOrder, TOrderItem } from "./order.interface";
+import {
+  TOrder,
+  TOrderItem,
+  TArchiveSummary,
+  TArchiveMonthSummary,
+} from "./order.interface";
 import AppError from "../../errors/AppError";
 import httpStatus from "http-status";
 import { TrashItem } from "../trash/trash.model";
@@ -10,6 +15,7 @@ import { emailService } from "../../utils/emailService";
 import { Review } from "../review/review.model";
 import { PickupPoint } from "../pickuppoint/pickuppoint.model";
 import { SettingsService } from "../settings/settings.service";
+import { getNextInvoiceSerial } from "../../utils/counter";
 
 const generateOrderNumber = (): string => {
   const timestamp = Date.now().toString();
@@ -138,7 +144,7 @@ interface DepositBreakdown {
 const roundToTwo = (value: number) => Math.round(value * 100) / 100;
 
 // Mirrors frontend/utils/essential_functions.ts#getAdditionalChargeforWeight,
-// but reads the tiered charges from admin-configurable settings instead of
+// but reads the charges from admin-configurable settings instead of
 // hardcoded constants, and is the authoritative value saved on the order
 // (the client-submitted deliveryCharge is only used for display/estimation).
 const resolveDeliveryCharge = async (
@@ -146,19 +152,27 @@ const resolveDeliveryCharge = async (
   city: string | undefined,
   productDetails: Array<{ product: any; quantity: number }>,
 ) => {
-  // Pickup and express delivery don't use the weight-based regular delivery charge
-  if (shippingType !== "regular_delivery") {
+  // Pickup point has no delivery leg
+  if (shippingType !== "regular_delivery" && shippingType !== "express_delivery") {
     return 0;
   }
 
   const settings = await SettingsService.getDeliveryChargeSettingsFromDB();
+  const isInsideDhaka = (city || "").trim().toLowerCase() === "dhaka";
+
+  if (shippingType === "express_delivery") {
+    return Math.round(
+      isInsideDhaka
+        ? settings.expressInsideDhakaCharge
+        : settings.expressOutsideDhakaCharge,
+    );
+  }
 
   const totalWeight = productDetails.reduce((acc, { product, quantity }) => {
     const weight = Number(product?.weight) || 0;
     return acc + weight * quantity;
   }, 0);
 
-  const isInsideDhaka = (city || "").trim().toLowerCase() === "dhaka";
   const baseCharge = isInsideDhaka
     ? settings.insideDhakaCharge
     : settings.outsideDhakaCharge;
@@ -300,6 +314,7 @@ const placeOrderIntoDB = async (
 
   // Generate order number and tracking ID
   orderData.orderNumber = generateOrderNumber();
+  orderData.invoiceSerial = await getNextInvoiceSerial();
   orderData.trackingCode = generateTrackingId();
   orderData.user = userUuid;
   orderData.isGuest = false;
@@ -538,13 +553,34 @@ const getAllOrdersFromDB = async (query: Record<string, unknown>) => {
   if (query.search) {
     searchQuery.$or = [
       { orderNumber: { $regex: query.search, $options: "i" } },
+      { invoiceSerial: { $regex: query.search, $options: "i" } },
       { email: { $regex: query.search, $options: "i" } },
       { phone: { $regex: query.search, $options: "i" } },
     ];
   }
 
-  if (query.orderStatus) {
+  const archiveYear = query.year ? Number(query.year) : undefined;
+  const archiveMonth = query.month ? Number(query.month) : undefined;
+  const isArchiveView = archiveYear !== undefined && archiveMonth !== undefined;
+
+  if (isArchiveView) {
+    // Archive is delivered-only by definition — ignore any client-supplied
+    // orderStatus so a stray param can't leak non-delivered orders in.
+    // Bucketed by the month the order was PLACED (createdAt), not the month
+    // it was delivered — an order placed in March and delivered in September
+    // belongs in the March archive.
+    searchQuery.orderStatus = "delivered";
+    searchQuery.createdAt = {
+      $gte: new Date(archiveYear, archiveMonth - 1, 1),
+      $lte: new Date(archiveYear, archiveMonth, 0, 23, 59, 59, 999),
+    };
+  } else if (query.orderStatus && query.orderStatus !== "delivered") {
     searchQuery.orderStatus = query.orderStatus;
+  } else {
+    // Active Orders default: delivered orders now live only in the archive.
+    // Covers both "no filter given" and a stray ?order_status=delivered, so
+    // neither can leak delivered orders back into the active view/search/export.
+    searchQuery.orderStatus = { $ne: "delivered" };
   }
 
   if (query.paymentStatus) {
@@ -851,6 +887,7 @@ const placeGuestOrderIntoDB = async (payload: TOrder & { items: any[] }) => {
 
   // Generate order number and tracking ID
   orderData.orderNumber = generateOrderNumber();
+  orderData.invoiceSerial = await getNextInvoiceSerial();
   orderData.trackingCode = generateTrackingId();
   orderData.isGuest = true;
   orderData.guestEmail = orderData.email;
@@ -1090,6 +1127,81 @@ const getOrderItemsForReviewFromDB = async (
   };
 };
 
+const getArchiveSummaryFromDB = async (
+  year?: number,
+): Promise<TArchiveSummary> => {
+  const targetYear = year || new Date().getFullYear();
+  const startOfYear = new Date(targetYear, 0, 1);
+  const endOfYear = new Date(targetYear, 11, 31, 23, 59, 59, 999);
+
+  // Bucketed by the month the order was PLACED (createdAt), not delivered —
+  // matches getAllOrdersFromDB's archive-view filter above.
+  const raw = await Order.aggregate([
+    {
+      $match: {
+        orderStatus: "delivered",
+        createdAt: { $gte: startOfYear, $lte: endOfYear },
+      },
+    },
+    {
+      $group: {
+        _id: { $month: "$createdAt" },
+        orderCount: { $sum: 1 },
+        totalAmountPaid: { $sum: "$amountPaid" },
+        totalPayable: { $sum: "$totalPayable" },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+  const rawByMonth = new Map(raw.map((r) => [r._id, r]));
+
+  const months: TArchiveMonthSummary[] = monthNames.map((monthName, idx) => {
+    const m = rawByMonth.get(idx + 1);
+    return {
+      month: idx + 1,
+      monthName,
+      orderCount: m?.orderCount || 0,
+      totalAmountPaid: m?.totalAmountPaid || 0,
+      totalPayable: m?.totalPayable || 0,
+    };
+  });
+
+  const totals = months.reduce(
+    (acc, m) => ({
+      orderCount: acc.orderCount + m.orderCount,
+      totalAmountPaid: acc.totalAmountPaid + m.totalAmountPaid,
+      totalPayable: acc.totalPayable + m.totalPayable,
+    }),
+    { orderCount: 0, totalAmountPaid: 0, totalPayable: 0 },
+  );
+
+  return { year: targetYear, months, totals };
+};
+
+const getArchiveYearsFromDB = async (): Promise<number[]> => {
+  const years = await Order.aggregate([
+    { $match: { orderStatus: "delivered" } },
+    { $group: { _id: { $year: "$createdAt" } } },
+    { $sort: { _id: -1 } },
+  ]);
+  return years.map((y) => y._id as number);
+};
+
 export const OrderServices = {
   placeOrderIntoDB,
   placeGuestOrderIntoDB,
@@ -1101,4 +1213,6 @@ export const OrderServices = {
   deleteOrderFromDB,
   trackOrderByTrackingCode,
   getOrderItemsForReviewFromDB,
+  getArchiveSummaryFromDB,
+  getArchiveYearsFromDB,
 };

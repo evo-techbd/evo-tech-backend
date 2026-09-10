@@ -5,6 +5,8 @@ const DEFAULT_DELIVERY_CHARGE_SETTINGS = {
   insideDhakaCharge: 70,
   outsideDhakaCharge: 120,
   additionalChargePerKg: 20,
+  expressInsideDhakaCharge: 150,
+  expressOutsideDhakaCharge: 250,
 };
 
 // Delivery charge is a singleton document - create it with defaults on first read

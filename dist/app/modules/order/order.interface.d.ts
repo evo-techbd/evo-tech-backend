@@ -10,6 +10,7 @@ export interface TPickupPoint {
 export interface TOrder {
     _id?: string;
     orderNumber: string;
+    invoiceSerial?: string;
     user?: string;
     guestEmail?: string;
     isGuest?: boolean;
@@ -53,6 +54,22 @@ export interface TOrder {
     deliveredAt?: Date;
     createdAt?: Date;
     updatedAt?: Date;
+}
+export interface TArchiveMonthSummary {
+    month: number;
+    monthName: string;
+    orderCount: number;
+    totalAmountPaid: number;
+    totalPayable: number;
+}
+export interface TArchiveSummary {
+    year: number;
+    months: TArchiveMonthSummary[];
+    totals: {
+        orderCount: number;
+        totalAmountPaid: number;
+        totalPayable: number;
+    };
 }
 export interface TOrderItem {
     _id?: string;

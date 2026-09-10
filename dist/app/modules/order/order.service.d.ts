@@ -1,4 +1,4 @@
-import { TOrder, TOrderItem } from "./order.interface";
+import { TOrder, TOrderItem, TArchiveSummary } from "./order.interface";
 import mongoose, { Types } from "mongoose";
 export declare const normalizeOrderObject: (orderDoc: any) => any;
 export declare const OrderServices: {
@@ -111,5 +111,7 @@ export declare const OrderServices: {
             hasReview: boolean;
         }[];
     }>;
+    getArchiveSummaryFromDB: (year?: number) => Promise<TArchiveSummary>;
+    getArchiveYearsFromDB: () => Promise<number[]>;
 };
 //# sourceMappingURL=order.service.d.ts.map

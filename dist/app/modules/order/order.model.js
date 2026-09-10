@@ -9,6 +9,11 @@ const orderSchema = new mongoose_1.Schema({
         unique: true,
         default: () => `ORD-${Date.now()}-${(0, uuid_1.v4)().substring(0, 8).toUpperCase()}`,
     },
+    invoiceSerial: {
+        // Resets every month (e.g. "09001"), so it is NOT unique across the
+        // whole collection — only within the month it was issued.
+        type: String,
+    },
     user: {
         type: String,
         required: false, // Optional for guest orders
@@ -237,10 +242,13 @@ const orderItemSchema = new mongoose_1.Schema({
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ orderStatus: 1, createdAt: -1 });
 orderSchema.index({ paymentStatus: 1, createdAt: -1 });
+// Also serves the archive view: delivered orders scoped to a createdAt
+// (order-placement) month range.
 orderSchema.index({ user: 1, createdAt: -1 });
 orderSchema.index({ email: 1 });
 orderSchema.index({ phone: 1 });
 orderSchema.index({ trackingCode: 1 });
+orderSchema.index({ invoiceSerial: 1 });
 // Common order item lookup paths
 orderItemSchema.index({ order: 1 });
 orderItemSchema.index({ product: 1 });

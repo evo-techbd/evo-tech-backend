@@ -21,6 +21,18 @@ const deliveryChargeSettingsSchema = new Schema<IDeliveryChargeSettings>(
       min: 0,
       default: 20,
     },
+    expressInsideDhakaCharge: {
+      type: Number,
+      required: [true, "Express delivery charge (inside Dhaka) is required"],
+      min: 0,
+      default: 150,
+    },
+    expressOutsideDhakaCharge: {
+      type: Number,
+      required: [true, "Express delivery charge (outside Dhaka) is required"],
+      min: 0,
+      default: 250,
+    },
   },
   {
     timestamps: true,

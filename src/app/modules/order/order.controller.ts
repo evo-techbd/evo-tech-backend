@@ -143,6 +143,29 @@ const getOrderItemsForReview = catchAsync(async (req, res) => {
   });
 });
 
+const getOrderArchiveSummary = catchAsync(async (req, res) => {
+  const year = req.query.year ? Number(req.query.year) : undefined;
+  const result = await OrderServices.getArchiveSummaryFromDB(year);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Order archive summary retrieved successfully",
+    data: result,
+  });
+});
+
+const getOrderArchiveYears = catchAsync(async (req, res) => {
+  const result = await OrderServices.getArchiveYearsFromDB();
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Order archive years retrieved successfully",
+    data: result,
+  });
+});
+
 export const OrderControllers = {
   placeOrder,
   placeGuestOrder,
@@ -154,4 +177,6 @@ export const OrderControllers = {
   deleteOrder,
   trackOrder,
   getOrderItemsForReview,
+  getOrderArchiveSummary,
+  getOrderArchiveYears,
 };

@@ -7,7 +7,8 @@ const placeOrder = catchAsync(async (req, res) => {
   const userUuid = req.user.uuid;
   const result = await OrderServices.placeOrderIntoDB(
     req.body,
-    userUuid as string
+    userUuid as string,
+    req.user.userId,
   );
 
   sendResponse(res, {

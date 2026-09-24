@@ -22,43 +22,50 @@ const allowedOrigins = Array.isArray(config.cors_origin)
 // Log allowed origins for debugging
 console.log("Allowed CORS Origins:", allowedOrigins);
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or Postman)
-      if (!origin) return callback(null, true);
+// EPS returns the customer's browser via a top-level navigation (possibly a
+// cross-site form POST carrying the gateway's Origin). That is not a CORS
+// request, so rejecting the origin would only break the payment return.
+const isEpsCallback = (path: string) => path.includes("/payment/eps/callback/");
 
-      // Check if origin is allowed
-      const isAllowed = allowedOrigins.some((allowed) => {
-        if (allowed === "*") return true;
-        if (allowed === origin) return true;
-        // Handle wildcards like *.vercel.app
-        if (allowed.includes("*")) {
-          const pattern = allowed.replace(/\*/g, ".*");
-          const regex = new RegExp(`^${pattern}$`);
-          return regex.test(origin);
-        }
-        return false;
-      });
+const corsMiddleware = cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or Postman)
+    if (!origin) return callback(null, true);
 
-      if (isAllowed) {
-        callback(null, true);
-      } else {
-        console.warn(`CORS blocked origin: ${origin}`);
-        callback(new Error("Not allowed by CORS"));
+    // Check if origin is allowed
+    const isAllowed = allowedOrigins.some((allowed) => {
+      if (allowed === "*") return true;
+      if (allowed === origin) return true;
+      // Handle wildcards like *.vercel.app
+      if (allowed.includes("*")) {
+        const pattern = allowed.replace(/\*/g, ".*");
+        const regex = new RegExp(`^${pattern}$`);
+        return regex.test(origin);
       }
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "X-Requested-With",
-      "Accept",
-    ],
-    exposedHeaders: ["Content-Length", "X-Requested-With"],
-    maxAge: 86400, // 24 hours
-  }),
+      return false;
+    });
+
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS blocked origin: ${origin}`);
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Accept",
+  ],
+  exposedHeaders: ["Content-Length", "X-Requested-With"],
+  maxAge: 86400, // 24 hours
+});
+
+app.use((req: Request, res: Response, next: NextFunction) =>
+  isEpsCallback(req.path) ? next() : corsMiddleware(req, res, next),
 );
 
 // Handle preflight requests explicitly

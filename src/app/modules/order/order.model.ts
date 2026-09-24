@@ -1,6 +1,22 @@
 import { Schema, model } from "mongoose";
-import { TOrder, TOrderItem } from "./order.interface";
+import { TEpsPaymentAttempt, TOrder, TOrderItem } from "./order.interface";
 import { v4 as uuidv4 } from "uuid";
+
+const epsPaymentAttemptSchema = new Schema<TEpsPaymentAttempt>(
+  {
+    merchantTransactionId: { type: String, required: true },
+    epsTransactionId: { type: String },
+    amount: { type: Number, required: true },
+    status: {
+      type: String,
+      enum: ["initiated", "success", "failed", "cancelled", "amount_mismatch"],
+      default: "initiated",
+    },
+    financialEntity: { type: String },
+    verifiedAt: { type: Date },
+  },
+  { _id: false, timestamps: { createdAt: true, updatedAt: false } },
+);
 
 const orderSchema = new Schema<TOrder>(
   {
@@ -92,6 +108,10 @@ const orderSchema = new Schema<TOrder>(
     },
     bkashPaymentID: {
       type: String,
+    },
+    epsPayments: {
+      type: [epsPaymentAttemptSchema],
+      default: undefined,
     },
     terms: {
       type: Boolean,
@@ -257,6 +277,8 @@ orderSchema.index({ email: 1 });
 orderSchema.index({ phone: 1 });
 orderSchema.index({ trackingCode: 1 });
 orderSchema.index({ invoiceSerial: 1 });
+// EPS callbacks look the order up by the attempt's merchantTransactionId
+orderSchema.index({ "epsPayments.merchantTransactionId": 1 }, { sparse: true });
 
 // Common order item lookup paths
 orderItemSchema.index({ order: 1 });

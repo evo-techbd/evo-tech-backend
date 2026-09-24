@@ -1,5 +1,48 @@
 import { PrintingSale } from "./printing-sale.model";
 import { TPrintingSale } from "./printing-sale.interface";
+import { getNextInvoiceSerial } from "../../utils/counter";
+
+// Sales created before invoice serials existed have none. Give each one the
+// next number from the shared order/sale monthly counter for the month it was
+// created in, the first time it's loaded. The conditional update means two
+// concurrent loads can't overwrite each other's serial.
+const ensureInvoiceSerials = async <
+  T extends { _id?: unknown; createdAt?: Date; invoiceSerial?: string },
+>(
+  sales: T[],
+): Promise<T[]> => {
+  const missing = sales
+    .filter((sale) => !sale.invoiceSerial)
+    .sort(
+      (a, b) =>
+        new Date(a.createdAt || 0).getTime() -
+        new Date(b.createdAt || 0).getTime(),
+    );
+
+  for (const sale of missing) {
+    const serial = await getNextInvoiceSerial(
+      sale.createdAt ? new Date(sale.createdAt) : new Date(),
+    );
+    const updated = await PrintingSale.findOneAndUpdate(
+      {
+        _id: sale._id,
+        $or: [
+          { invoiceSerial: { $exists: false } },
+          { invoiceSerial: null },
+          { invoiceSerial: "" },
+        ],
+      },
+      { $set: { invoiceSerial: serial } },
+      { new: true },
+    ).lean();
+    sale.invoiceSerial = updated
+      ? updated.invoiceSerial
+      : (await PrintingSale.findById(sale._id).select("invoiceSerial").lean())
+          ?.invoiceSerial;
+  }
+
+  return sales;
+};
 
 const createSale = async (payload: TPrintingSale) => {
   // Recalculate prices server-side for safety
@@ -13,6 +56,7 @@ const createSale = async (payload: TPrintingSale) => {
     ...payload,
     items,
     totalPrice,
+    invoiceSerial: await getNextInvoiceSerial(),
   });
   return result;
 };
@@ -31,6 +75,7 @@ const getAllSales = async (query: Record<string, unknown>) => {
       { phone: { $regex: search, $options: "i" } },
       { email: { $regex: search, $options: "i" } },
       { saleNumber: { $regex: search, $options: "i" } },
+      { invoiceSerial: { $regex: search, $options: "i" } },
     ];
   }
 
@@ -48,6 +93,8 @@ const getAllSales = async (query: Record<string, unknown>) => {
     PrintingSale.countDocuments(filter),
   ]);
 
+  await ensureInvoiceSerials(result);
+
   return {
     meta: {
       page,
@@ -63,6 +110,7 @@ const getSingleSale = async (id: string) => {
   const result = await PrintingSale.findById(id)
     .populate("createdBy", "firstName lastName email")
     .lean();
+  if (result) await ensureInvoiceSerials([result]);
   return result;
 };
 
@@ -79,7 +127,11 @@ const updateSalePaymentStatus = async (
 };
 
 const updateSale = async (id: string, payload: Partial<TPrintingSale>) => {
-  let updateData = { ...payload };
+  // The invoice serial and sale number are assigned once at creation and
+  // must never change, since they are already printed on handed-out invoices.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { invoiceSerial, saleNumber, ...rest } = payload;
+  let updateData: Partial<TPrintingSale> = { ...rest };
   
   // Recalculate prices if items are provided
   if (payload.items && payload.items.length > 0) {

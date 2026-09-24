@@ -16,6 +16,7 @@ import { Review } from "../review/review.model";
 import { PickupPoint } from "../pickuppoint/pickuppoint.model";
 import { SettingsService } from "../settings/settings.service";
 import { getNextInvoiceSerial } from "../../utils/counter";
+import { CouponService } from "../coupon/coupon.service";
 
 const generateOrderNumber = (): string => {
   const timestamp = Date.now().toString();
@@ -143,6 +144,50 @@ interface DepositBreakdown {
 
 const roundToTwo = (value: number) => Math.round(value * 100) / 100;
 
+// Unit price the customer is charged. Group Buy items sell at their
+// preOrderPrice — the same rule the storefront uses when adding to cart.
+const getUnitSellingPrice = (product: any): number =>
+  product?.isPreOrder &&
+  typeof product.preOrderPrice === "number" &&
+  product.preOrderPrice > 0
+    ? product.preOrderPrice
+    : product?.price || 0;
+
+// Subtotal and discount are derived server-side from product prices and the
+// coupon — never taken from the request body, since they feed both what the
+// customer is charged and every revenue figure on the admin dashboard.
+const resolveOrderPricing = async (
+  productDetails: Array<{ subtotal: number }>,
+  couponCode: string | undefined,
+  couponUserId: string | undefined,
+) => {
+  const subtotal = roundToTwo(
+    productDetails.reduce((sum, detail) => sum + detail.subtotal, 0),
+  );
+
+  let discount = 0;
+  if (couponCode && couponUserId) {
+    const { discountAmount } = await CouponService.validateCoupon(
+      couponCode,
+      couponUserId,
+      subtotal,
+    );
+    discount = roundToTwo(discountAmount);
+  }
+
+  return { subtotal, discount };
+};
+
+// Payment and fulfilment state always starts fresh; these fields are only
+// changed by verified payment callbacks or by an admin.
+const resetOrderLifecycleFields = (orderData: Partial<TOrder>) => {
+  orderData.orderStatus = "pending";
+  orderData.paymentStatus = "pending";
+  orderData.amountPaid = 0;
+  orderData.amountDue = orderData.totalPayable || 0;
+  delete orderData.deliveredAt;
+};
+
 // Mirrors frontend/utils/essential_functions.ts#getAdditionalChargeforWeight,
 // but reads the charges from admin-configurable settings instead of
 // hardcoded constants, and is the authoritative value saved on the order
@@ -195,12 +240,7 @@ const calculateDepositBreakdown = (
   productDetails.forEach(({ product, quantity }) => {
     if (product?.isPreOrder) {
       preOrderItemsCount += quantity;
-      const unitPrice =
-        typeof product.preOrderPrice === "number" &&
-        !isNaN(product.preOrderPrice)
-          ? product.preOrderPrice
-          : product.price;
-      preOrderSubtotal += unitPrice * quantity;
+      preOrderSubtotal += getUnitSellingPrice(product) * quantity;
     }
   });
 
@@ -227,8 +267,11 @@ const calculateDepositBreakdown = (
   };
 };
 
-const VALID_PAYMENT_METHODS = ["cod", "cop", "bkash", "bank_transfer"];
+const VALID_PAYMENT_METHODS = ["cod", "cop", "bkash", "bank_transfer", "eps"];
 const CASH_PAYMENT_METHODS = ["cod", "cop"];
+// Paid on a hosted gateway after the order is placed, so there is no
+// customer-entered transaction ID to validate up front.
+const GATEWAY_PAYMENT_METHODS = ["eps"];
 // Letters/digits/hyphen/slash, 6-25 chars, no spaces, must contain at least one digit.
 // Blocks junk like "AmiPorepayKorbo" while still accepting real bKash/bank references.
 const TRANSACTION_ID_REGEX = /^(?=.*\d)[A-Za-z0-9\-/]{6,25}$/;
@@ -245,11 +288,14 @@ const validateOrderPayment = (
   if (isPreOrderOrder && CASH_PAYMENT_METHODS.includes(paymentMethod)) {
     throw new AppError(
       httpStatus.BAD_REQUEST,
-      "Cash on Delivery/Pickup is not available for Group Buy items. Please pay via bKash or Bank Transfer.",
+      "Cash on Delivery/Pickup is not available for Group Buy items. Please pay online, via bKash or Bank Transfer.",
     );
   }
 
-  if (!CASH_PAYMENT_METHODS.includes(paymentMethod)) {
+  if (
+    !CASH_PAYMENT_METHODS.includes(paymentMethod) &&
+    !GATEWAY_PAYMENT_METHODS.includes(paymentMethod)
+  ) {
     const trimmedId = (transactionId || "").trim();
     if (!trimmedId || !TRANSACTION_ID_REGEX.test(trimmedId)) {
       throw new AppError(
@@ -261,10 +307,11 @@ const validateOrderPayment = (
 };
 
 const placeOrderIntoDB = async (
-  payload: TOrder & { items: any[] },
+  payload: TOrder & { items: any[]; couponCode?: string },
   userUuid: string,
+  couponUserId?: string,
 ) => {
-  const { items, ...orderData } = payload;
+  const { items, couponCode, ...orderData } = payload;
 
   // Cart is managed in frontend Redux, use items from request body
   if (!items || items.length === 0) {
@@ -302,9 +349,14 @@ const placeOrderIntoDB = async (
         product,
         quantity: item.item_quantity,
         selectedColor: item.item_color || "",
-        subtotal: product.price * item.item_quantity,
+        subtotal: getUnitSellingPrice(product) * item.item_quantity,
       };
     }),
+  );
+
+  Object.assign(
+    orderData,
+    await resolveOrderPricing(productDetails, couponCode, couponUserId),
   );
 
   // Normalize phone number
@@ -347,10 +399,17 @@ const placeOrderIntoDB = async (
     depositInfo.isPreOrderOrder,
   );
 
+  // Gateway orders get their transaction reference from the verified EPS
+  // callback, never from the client.
+  if (GATEWAY_PAYMENT_METHODS.includes(orderData.paymentMethod)) {
+    orderData.transactionId = undefined;
+  }
+
   Object.assign(orderData, depositInfo, {
     depositPaid: 0,
     balancePaid: 0,
   });
+  resetOrderLifecycleFields(orderData);
 
   // Create order
   const order = await Order.create(orderData);
@@ -360,7 +419,7 @@ const placeOrderIntoDB = async (
     order: order._id,
     product: detail.product._id,
     productName: detail.product.name,
-    productPrice: detail.product.price,
+    productPrice: getUnitSellingPrice(detail.product),
     buyingPrice: detail.product.buyingPrice || 0,
     quantity: detail.quantity,
     selectedColor: detail.selectedColor,
@@ -765,6 +824,19 @@ const updateOrderStatusIntoDB = async (
     }
   }
 
+  // Marking an order "paid" (e.g. from the status dropdown) without an amount
+  // means the customer settled in full — record it, or cash collected and
+  // amount due would disagree with the status.
+  if (payload.paymentStatus === "paid" && payload.amountPaid === undefined) {
+    payload.amountPaid = payload.totalPayable ?? order.totalPayable ?? 0;
+    if (order.isPreOrderOrder) {
+      payload.depositPaid = payload.depositDue ?? order.depositDue ?? 0;
+      payload.balancePaid = payload.balanceDue ?? order.balanceDue ?? 0;
+      payload.depositStatus = "paid";
+      payload.balanceStatus = "paid";
+    }
+  }
+
   // Keep amountDue/paymentStatus in sync when financial fields change.
   if (payload.amountPaid !== undefined || payload.totalPayable !== undefined) {
     const totalPayable = payload.totalPayable ?? order.totalPayable ?? 0;
@@ -820,8 +892,12 @@ const deleteOrderFromDB = async (orderId: string, deletedBy?: string) => {
 };
 
 // Guest checkout - no authentication required
-const placeGuestOrderIntoDB = async (payload: TOrder & { items: any[] }) => {
-  const { items, ...orderData } = payload;
+const placeGuestOrderIntoDB = async (
+  payload: TOrder & { items: any[]; couponCode?: string },
+) => {
+  // Coupons can only be validated for signed-in users, so guest orders never
+  // carry a discount.
+  const { items, couponCode: _couponCode, ...orderData } = payload;
 
   if (!items || items.length === 0) {
     throw new AppError(httpStatus.BAD_REQUEST, "Cart is empty");
@@ -870,7 +946,8 @@ const placeGuestOrderIntoDB = async (payload: TOrder & { items: any[] }) => {
       if (!product) {
         throw new AppError(httpStatus.NOT_FOUND, `Product not found`);
       }
-      const itemTotal = product.price * (item.item_quantity || item.quantity);
+      const itemTotal =
+        getUnitSellingPrice(product) * (item.item_quantity || item.quantity);
       return {
         product,
         quantity: item.item_quantity || item.quantity,
@@ -878,6 +955,11 @@ const placeGuestOrderIntoDB = async (payload: TOrder & { items: any[] }) => {
         subtotal: itemTotal,
       };
     }),
+  );
+
+  Object.assign(
+    orderData,
+    await resolveOrderPricing(productDetails, undefined, undefined),
   );
 
   // Normalize phone number
@@ -921,10 +1003,17 @@ const placeGuestOrderIntoDB = async (payload: TOrder & { items: any[] }) => {
     depositInfo.isPreOrderOrder,
   );
 
+  // Gateway orders get their transaction reference from the verified EPS
+  // callback, never from the client.
+  if (GATEWAY_PAYMENT_METHODS.includes(orderData.paymentMethod)) {
+    orderData.transactionId = undefined;
+  }
+
   Object.assign(orderData, depositInfo, {
     depositPaid: 0,
     balancePaid: 0,
   });
+  resetOrderLifecycleFields(orderData);
 
   // Create order
   const order = await Order.create(orderData);
@@ -934,7 +1023,7 @@ const placeGuestOrderIntoDB = async (payload: TOrder & { items: any[] }) => {
     order: order._id,
     product: detail.product._id,
     productName: detail.product.name,
-    productPrice: detail.product.price,
+    productPrice: getUnitSellingPrice(detail.product),
     buyingPrice: detail.product.buyingPrice || 0,
     quantity: detail.quantity,
     selectedColor: detail.selectedColor,

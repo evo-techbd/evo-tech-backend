@@ -6,67 +6,11 @@ import BkashService from "./payment.service";
 import config from "../../config";
 import { Order } from "../order/order.model";
 import AppError from "../../errors/AppError";
-
-const toTwoDecimals = (value: number) => Math.round(value * 100) / 100;
-
-const getOutstandingAmounts = (order: any) => {
-  const depositDue = order.depositDue ?? 0;
-  const depositPaid = order.depositPaid ?? 0;
-  const balanceDue =
-    order.balanceDue ?? Math.max((order.totalPayable ?? 0) - depositDue, 0);
-  const balancePaid = order.balancePaid ?? 0;
-
-  return {
-    depositOutstanding: Math.max(depositDue - depositPaid, 0),
-    balanceOutstanding: Math.max(balanceDue - balancePaid, 0),
-  };
-};
-
-const applyPaymentProgress = (order: any, paymentAmount: number) => {
-  let remaining = paymentAmount;
-  const depositDue = order.depositDue ?? 0;
-  const balanceDue =
-    order.balanceDue ?? Math.max((order.totalPayable ?? 0) - depositDue, 0);
-
-  const depositPaid = order.depositPaid ?? 0;
-  const balancePaid = order.balancePaid ?? 0;
-
-  order.depositStatus =
-    order.depositStatus || (depositDue > 0 ? "pending" : "paid");
-  order.balanceStatus =
-    order.balanceStatus || (balanceDue > 0 ? "pending" : "paid");
-
-  const depositOutstanding = Math.max(depositDue - depositPaid, 0);
-  if (depositOutstanding > 0 && remaining > 0) {
-    const applied = Math.min(remaining, depositOutstanding);
-    order.depositPaid = toTwoDecimals(depositPaid + applied);
-    remaining -= applied;
-    if (Math.max(depositDue - order.depositPaid, 0) <= 0.01) {
-      order.depositStatus = "paid";
-    }
-  }
-
-  const balanceOutstanding = Math.max(balanceDue - (order.balancePaid ?? 0), 0);
-  if (remaining > 0 && balanceOutstanding > 0) {
-    const applied = Math.min(remaining, balanceOutstanding);
-    order.balancePaid = toTwoDecimals(balancePaid + applied);
-    remaining -= applied;
-    if (Math.max(balanceDue - order.balancePaid, 0) <= 0.01) {
-      order.balanceStatus = "paid";
-    }
-  }
-
-  if (
-    (depositDue === 0 || order.depositStatus === "paid") &&
-    order.balanceStatus === "paid"
-  ) {
-    order.paymentStatus = "paid";
-  } else if ((order.depositPaid ?? 0) > 0 || (order.balancePaid ?? 0) > 0) {
-    order.paymentStatus = "partial";
-  } else {
-    order.paymentStatus = "pending";
-  }
-};
+import {
+  applyPaymentProgress,
+  getOutstandingAmounts,
+  toTwoDecimals,
+} from "./payment.utils";
 
 /**
  * Create a bKash payment

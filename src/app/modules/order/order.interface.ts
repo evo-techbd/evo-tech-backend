@@ -9,6 +9,19 @@ export interface TPickupPoint {
   hours?: string;
 }
 
+// One redirect to the EPS hosted payment page. A customer may retry a failed
+// or abandoned payment, so an order can accumulate several attempts; each has
+// its own merchantTransactionId, which is what EPS reports back on.
+export interface TEpsPaymentAttempt {
+  merchantTransactionId: string;
+  epsTransactionId?: string; // EPS's own reference, known after initialize
+  amount: number;
+  status: "initiated" | "success" | "failed" | "cancelled" | "amount_mismatch";
+  financialEntity?: string; // Channel the customer paid with (bKash, card, ...)
+  verifiedAt?: Date;
+  createdAt?: Date;
+}
+
 export interface TOrder {
   _id?: string;
   orderNumber: string;
@@ -36,6 +49,7 @@ export interface TOrder {
   transactionId?: string;
   bkashTransactionId?: string; // bKash specific transaction ID
   bkashPaymentID?: string; // bKash payment ID
+  epsPayments?: TEpsPaymentAttempt[];
   terms: boolean;
   subtotal: number;
   discount: number;

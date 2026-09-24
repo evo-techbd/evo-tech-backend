@@ -35,6 +35,11 @@ const printingSaleSchema = new Schema<TPrintingSale>(
       default: () =>
         `PS-${Date.now()}-${uuidv4().substring(0, 4).toUpperCase()}`,
     },
+    invoiceSerial: {
+      // Resets every month (e.g. "09001"), so it is NOT unique across the
+      // whole collection — only within the month it was issued.
+      type: String,
+    },
     customerName: {
       type: String,
       required: true,
@@ -90,6 +95,8 @@ const printingSaleSchema = new Schema<TPrintingSale>(
     timestamps: true,
   },
 );
+
+printingSaleSchema.index({ invoiceSerial: 1 });
 
 export const PrintingSale = model<TPrintingSale>(
   "PrintingSale",

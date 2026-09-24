@@ -97,3 +97,75 @@ export interface BkashRefundResponse {
   currency: string;
   charge: string;
 }
+
+// ---------------------------------------------------------------------------
+// EPS (Easy Payment System) gateway
+// ---------------------------------------------------------------------------
+
+export interface EpsConfig {
+  base_url: string;
+  username: string;
+  password: string;
+  hash_key: string;
+  merchant_id: string;
+  store_id: string;
+}
+
+export interface EpsGetTokenResponse {
+  token: string;
+  expireDate: string;
+  errorMessage: string | null;
+  errorCode: string | null;
+}
+
+export interface EpsProductItem {
+  ProductName: string;
+  NoOfItem: string;
+  ProductProfile: string;
+  ProductCategory: string;
+  ProductPrice: string;
+}
+
+export interface EpsInitializeParams {
+  customerOrderId: string;
+  merchantTransactionId: string;
+  totalAmount: number;
+  successUrl: string;
+  failUrl: string;
+  cancelUrl: string;
+  customerName: string;
+  customerEmail: string;
+  customerAddress: string;
+  customerCity: string;
+  customerState: string;
+  customerPostcode: string;
+  customerPhone: string;
+  productName: string;
+  noOfItem: number;
+  productList: EpsProductItem[];
+  ipAddress?: string;
+  // Free-form reference echoed back by EPS on verification
+  valueA?: string;
+}
+
+export interface EpsInitializeResponse {
+  TransactionId: string;
+  RedirectURL: string;
+  ErrorMessage: string | null;
+  ErrorCode: string | null;
+}
+
+// Shape confirmed against the EPS sandbox. An unpaid session whose payment
+// page is still open reports Status "Cancel".
+export interface EpsVerifyResponse {
+  MerchantTransactionId: string;
+  EPSTransactionId: string;
+  Status: string; // Success | Failed | Cancel | ...
+  TotalAmount: string;
+  StoreAmount?: string;
+  TransactionDate: string;
+  FinancialEntity: string | null;
+  ValueA?: string;
+  ErrorMessage: string | null;
+  ErrorCode: string | null;
+}

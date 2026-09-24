@@ -21,7 +21,9 @@
     "diagnose:permissions": "ts-node-dev --transpile-only database/diagnosePermissions.ts",
     "test:permission-api": "ts-node-dev --transpile-only database/testPermissionAPI.ts",
     "migrate:database": "ts-node-dev --transpile-only scripts/migrate-database.ts",
-    "migrate:invoice-serial": "ts-node-dev --transpile-only database/migrations/backfillInvoiceSerial.ts"
+    "migrate:invoice-serial": "ts-node-dev --transpile-only database/migrations/backfillInvoiceSerial.ts",
+    "migrate:printing-sale-invoice-serial": "ts-node-dev --transpile-only database/migrations/backfillPrintingSaleInvoiceSerial.ts",
+    "migrate:paid-order-amounts": "ts-node-dev --transpile-only database/migrations/backfillPaidOrderAmounts.ts"
   },
   "keywords": [
     "express",

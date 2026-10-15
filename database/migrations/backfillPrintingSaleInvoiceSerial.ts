@@ -11,7 +11,7 @@ dotenv.config({ path: path.join(process.cwd(), '.env') });
 dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 
 // 3D printing sales share the orders' monthly invoice serial counter
-// (MM + 3-digit sequence, e.g. "09001"), so both kinds of invoice come off
+// (YY + MM + 3-digit sequence, e.g. "2609001"), so both kinds of invoice come off
 // one numbering and never print the same SL. Unlike the order backfill, this
 // only fills sales that don't have a serial yet, taking the next number from
 // the counter of the month each sale was created in — existing order serials

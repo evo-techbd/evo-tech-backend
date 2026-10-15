@@ -23,6 +23,7 @@
     "migrate:database": "ts-node-dev --transpile-only scripts/migrate-database.ts",
     "migrate:invoice-serial": "ts-node-dev --transpile-only database/migrations/backfillInvoiceSerial.ts",
     "migrate:printing-sale-invoice-serial": "ts-node-dev --transpile-only database/migrations/backfillPrintingSaleInvoiceSerial.ts",
+    "migrate:invoice-serial-year": "ts-node-dev --transpile-only database/migrations/convertInvoiceSerialToYearMonth.ts",
     "migrate:paid-order-amounts": "ts-node-dev --transpile-only database/migrations/backfillPaidOrderAmounts.ts"
   },
   "keywords": [

@@ -37,19 +37,19 @@ export const ensureSequenceAtLeast = async (
   );
 };
 
-// Invoice serials reset every calendar month, shop-style: MM + a 3-digit
-// sequence, e.g. 09001, 09002, ... then 06001 the following June. The
-// counter is keyed by year+month internally so two different Septembers a
-// year apart never collide, even though only the month shows up in the
-// printed number. The full formatted string (not just the running number)
-// is what gets stored on the order, so printing it never depends on
-// re-deriving the month from createdAt later.
+// Invoice serials reset every calendar month, shop-style: YY + MM + a 3-digit
+// sequence, e.g. 2610001, 2610002, ... then 2611001 the following month. The
+// counter is keyed by year+month so each month starts again from 001. The
+// full formatted string (not just the running number) is what gets stored on
+// the order, so printing it never depends on re-deriving the month from
+// createdAt later.
 const getMonthlyInvoiceSerialKey = (date: Date): string =>
   `invoiceSerial-${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 
-const formatInvoiceSerial = (date: Date, sequence: number): string => {
+export const formatInvoiceSerial = (date: Date, sequence: number): string => {
+  const year = String(date.getFullYear() % 100).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${month}${String(sequence).padStart(3, "0")}`;
+  return `${year}${month}${String(sequence).padStart(3, "0")}`;
 };
 
 export const getNextInvoiceSerial = async (

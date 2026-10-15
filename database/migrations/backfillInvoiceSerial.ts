@@ -10,8 +10,8 @@ dotenv.config({ path: path.join(process.cwd(), '.env') });
 // mongodb+srv:// needs, so point Node at public DNS servers that can.
 dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 
-// Invoice serials are shop-style: MM + a 3-digit sequence that resets every
-// calendar month (e.g. "09001", "09002", ... then "06001" the next June).
+// Invoice serials are shop-style: YY + MM + a 3-digit sequence that resets
+// every calendar month (e.g. "2609001", "2609002", ... then "2610001").
 // This (re)assigns every order's invoiceSerial from scratch, grouping by the
 // calendar month of its createdAt and numbering 1, 2, 3... within each month
 // in chronological order — safe to re-run any time (fully deterministic).
@@ -26,7 +26,7 @@ async function backfillInvoiceSerial() {
         console.log('Connected to MongoDB');
 
         const { Order } = require('../../src/app/modules/order/order.model');
-        const { ensureInvoiceSerialAtLeast } = require('../../src/app/utils/counter');
+        const { ensureInvoiceSerialAtLeast, formatInvoiceSerial } = require('../../src/app/utils/counter');
 
         const orders: { _id: mongoose.Types.ObjectId; createdAt: Date }[] =
             await Order.find({})
@@ -48,8 +48,7 @@ async function backfillInvoiceSerial() {
             const nextInMonth = (countInMonth.get(key) || 0) + 1;
             countInMonth.set(key, nextInMonth);
 
-            const month = String(createdAt.getMonth() + 1).padStart(2, '0');
-            const invoiceSerial = `${month}${String(nextInMonth).padStart(3, '0')}`;
+            const invoiceSerial = formatInvoiceSerial(createdAt, nextInMonth);
 
             await Order.updateOne(
                 { _id: order._id },

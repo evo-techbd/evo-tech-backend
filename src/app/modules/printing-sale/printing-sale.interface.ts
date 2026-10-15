@@ -28,3 +28,16 @@ export interface TPrintingSale {
   createdAt?: Date;
   updatedAt?: Date;
 }
+
+export interface TPrintingSaleArchiveMonthSummary {
+  month: number; // 1-12
+  monthName: string;
+  saleCount: number;
+  totalAmount: number;
+}
+
+export interface TPrintingSaleArchiveSummary {
+  year: number;
+  months: TPrintingSaleArchiveMonthSummary[];
+  totals: { saleCount: number; totalAmount: number };
+}

@@ -17,6 +17,7 @@ import { PickupPoint } from "../pickuppoint/pickuppoint.model";
 import { SettingsService } from "../settings/settings.service";
 import { getNextInvoiceSerial } from "../../utils/counter";
 import { CouponService } from "../coupon/coupon.service";
+import { PaymentLogServices } from "../payment-log/payment-log.service";
 
 const generateOrderNumber = (): string => {
   const timestamp = Date.now().toString();
@@ -413,6 +414,11 @@ const placeOrderIntoDB = async (
 
   // Create order
   const order = await Order.create(orderData);
+  await PaymentLogServices.logOrderPaymentChange({}, order, {
+    event: "created",
+    source: "system",
+    note: "Order placed",
+  });
 
   // Create order items
   const orderItemsData = productDetails.map((detail) => ({
@@ -763,11 +769,13 @@ const getSingleOrderFromDB = async (orderId: string, userUuid?: string) => {
 const updateOrderStatusIntoDB = async (
   orderId: string,
   payload: Partial<TOrder>,
+  performedBy?: string,
 ) => {
   const order = await Order.findById(orderId);
   if (!order) {
     throw new AppError(httpStatus.NOT_FOUND, "Order not found");
   }
+  const paymentBefore = PaymentLogServices.orderPaymentSnapshot(order);
 
   // If order is being marked as delivered, set deliveredAt
   if (payload.orderStatus === "delivered" && !order.deliveredAt) {
@@ -860,6 +868,18 @@ const updateOrderStatusIntoDB = async (
   const result = await Order.findByIdAndUpdate(orderId, payload, {
     new: true,
   });
+
+  if (result) {
+    await PaymentLogServices.logOrderPaymentChange(paymentBefore, result, {
+      source: "admin",
+      method: "manual",
+      performedBy,
+      note:
+        payload.orderStatus === "cancelled" && order.orderStatus !== "cancelled"
+          ? "Order cancelled"
+          : undefined,
+    });
+  }
 
   return result;
 };
@@ -1017,6 +1037,11 @@ const placeGuestOrderIntoDB = async (
 
   // Create order
   const order = await Order.create(orderData);
+  await PaymentLogServices.logOrderPaymentChange({}, order, {
+    event: "created",
+    source: "system",
+    note: "Order placed",
+  });
 
   // Create order items
   const orderItemsData = productDetails.map((detail) => ({

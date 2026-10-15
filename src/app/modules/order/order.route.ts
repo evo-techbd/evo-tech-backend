@@ -2,6 +2,7 @@ import express from "express";
 import { OrderControllers } from "./order.controller";
 import auth from "../../middlewares/auth";
 import { USER_ROLE } from "../user/user.constant";
+import { PaymentLogControllers } from "../payment-log/payment-log.controller";
 
 const router = express.Router();
 
@@ -50,6 +51,11 @@ router.get(
   "/:id/items-for-review",
   auth(USER_ROLE.USER, USER_ROLE.ADMIN),
   OrderControllers.getOrderItemsForReview
+);
+router.get(
+  "/:id/payment-logs",
+  auth(USER_ROLE.ADMIN, USER_ROLE.EMPLOYEE),
+  PaymentLogControllers.getOrderPaymentLogs
 );
 router.put(
   "/:id",

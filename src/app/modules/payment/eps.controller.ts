@@ -15,6 +15,7 @@ import {
   getOutstandingAmounts,
   toTwoDecimals,
 } from "./payment.utils";
+import { PaymentLogServices } from "../payment-log/payment-log.service";
 
 type EpsOutcome = "success" | "failed" | "cancelled" | "pending";
 
@@ -109,12 +110,27 @@ const settleAttempt = async (
         attempt,
         verification,
       });
-      await Order.updateOne(openAttempt, {
-        $set: {
-          "epsPayments.$.status": "amount_mismatch",
-          "epsPayments.$.verifiedAt": new Date(),
+      const mismatched = await Order.findOneAndUpdate(
+        openAttempt,
+        {
+          $set: {
+            "epsPayments.$.status": "amount_mismatch",
+            "epsPayments.$.verifiedAt": new Date(),
+          },
         },
-      });
+        { new: true },
+      );
+      // Order is left untouched, so force an entry to keep the rejection visible
+      if (mismatched) {
+        const snapshot = PaymentLogServices.orderPaymentSnapshot(mismatched);
+        await PaymentLogServices.logOrderPaymentChange(snapshot, mismatched, {
+          event: "payment_failed",
+          source: "gateway",
+          method: "eps",
+          transactionId: readEpsTransactionId(verification),
+          note: `EPS amount mismatch: expected ${attempt.amount}, gateway reported ${paidAmount}`,
+        });
+      }
       return "failed";
     }
 
@@ -134,9 +150,15 @@ const settleAttempt = async (
 
     // Not claimed means another request already settled this attempt
     if (claimed) {
+      const paymentBefore = PaymentLogServices.orderPaymentSnapshot(claimed);
       applyPaymentProgress(claimed, attempt.amount);
       claimed.transactionId = readEpsTransactionId(verification);
       await claimed.save();
+      await PaymentLogServices.logOrderPaymentChange(paymentBefore, claimed, {
+        source: "gateway",
+        method: "eps",
+        transactionId: claimed.transactionId,
+      });
     }
     return "success";
   }
@@ -152,10 +174,25 @@ const settleAttempt = async (
       },
     });
     // Surface the failure to admins only while nothing has been paid
-    await Order.updateOne(
+    const failed = await Order.findOneAndUpdate(
       { _id: orderId, paymentStatus: "pending" },
       { $set: { paymentStatus: "failed" } },
+      { new: true },
     );
+    if (failed) {
+      await PaymentLogServices.logOrderPaymentChange(
+        { paymentStatus: "pending", amountPaid: failed.amountPaid ?? 0 },
+        failed,
+        {
+          source: "gateway",
+          method: "eps",
+          note:
+            outcome === "cancelled"
+              ? "EPS payment cancelled"
+              : "EPS payment failed",
+        },
+      );
+    }
     return outcome;
   }
 

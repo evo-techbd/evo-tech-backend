@@ -11,6 +11,7 @@ import {
   getOutstandingAmounts,
   toTwoDecimals,
 } from "./payment.utils";
+import { PaymentLogServices } from "../payment-log/payment-log.service";
 
 /**
  * Create a bKash payment
@@ -89,6 +90,7 @@ const executeBkashPayment = catchAsync(async (req: Request, res: Response) => {
     throw new AppError(httpStatus.NOT_FOUND, "Order not found");
   }
 
+  const paymentBefore = PaymentLogServices.orderPaymentSnapshot(order);
   order.bkashTransactionId = result.trxID;
   order.paymentMethod = "bkash";
 
@@ -98,6 +100,11 @@ const executeBkashPayment = catchAsync(async (req: Request, res: Response) => {
   }
 
   await order.save();
+  await PaymentLogServices.logOrderPaymentChange(paymentBefore, order, {
+    source: "gateway",
+    method: "bkash",
+    transactionId: result.trxID,
+  });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -128,6 +135,16 @@ const queryBkashPayment = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// findOneAndUpdate returns the order as it was before being marked failed.
+const logBkashFailure = async (previous: any, note: string) => {
+  if (!previous) return;
+  await PaymentLogServices.logOrderPaymentChange(
+    PaymentLogServices.orderPaymentSnapshot(previous),
+    { ...previous.toObject(), paymentStatus: "failed" },
+    { source: "gateway", method: "bkash", note },
+  );
+};
+
 /**
  * Handle bKash callback (success/failure/cancel)
  */
@@ -142,12 +159,18 @@ const handleBkashCallback = catchAsync(async (req: Request, res: Response) => {
     const order = await Order.findOne({ bkashPaymentID: paymentID });
 
     if (order) {
+      const paymentBefore = PaymentLogServices.orderPaymentSnapshot(order);
       order.bkashTransactionId = paymentStatus.trxID || "";
       if (paymentStatus.transactionStatus === "Completed") {
         const paidAmount = Number(paymentStatus.amount) || 0;
         applyPaymentProgress(order, paidAmount);
       }
       await order.save();
+      await PaymentLogServices.logOrderPaymentChange(paymentBefore, order, {
+        source: "gateway",
+        method: "bkash",
+        transactionId: paymentStatus.trxID,
+      });
     }
 
     // Redirect to success page
@@ -157,19 +180,21 @@ const handleBkashCallback = catchAsync(async (req: Request, res: Response) => {
   } else if (status === "failure") {
     // Mark the associated order's payment as failed
     if (paymentID) {
-      await Order.findOneAndUpdate(
+      const previous = await Order.findOneAndUpdate(
         { bkashPaymentID: paymentID },
         { paymentStatus: "failed" }
       );
+      await logBkashFailure(previous, "bKash payment failed");
     }
     res.redirect(`${config.frontend_url}/checkout?status=failure`);
   } else if (status === "cancel") {
     // Mark the associated order's payment as failed (user cancelled payment)
     if (paymentID) {
-      await Order.findOneAndUpdate(
+      const previous = await Order.findOneAndUpdate(
         { bkashPaymentID: paymentID },
         { paymentStatus: "failed" }
       );
+      await logBkashFailure(previous, "bKash payment cancelled by customer");
     }
     res.redirect(`${config.frontend_url}/checkout?status=cancel`);
   } else {
@@ -197,12 +222,18 @@ const handleBkashWebhook = catchAsync(async (req: Request, res: Response) => {
     });
 
     if (order) {
+      const paymentBefore = PaymentLogServices.orderPaymentSnapshot(order);
       order.bkashTransactionId = paymentStatus.trxID || "";
       if (paymentStatus.transactionStatus === "Completed") {
         const paidAmount = Number(paymentStatus.amount) || 0;
         applyPaymentProgress(order, paidAmount);
       }
       await order.save();
+      await PaymentLogServices.logOrderPaymentChange(paymentBefore, order, {
+        source: "gateway",
+        method: "bkash",
+        transactionId: paymentStatus.trxID,
+      });
     }
   }
 

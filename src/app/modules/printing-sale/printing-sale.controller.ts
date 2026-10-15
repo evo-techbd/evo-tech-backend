@@ -44,6 +44,7 @@ const updatePaymentStatus = catchAsync(async (req, res) => {
   const result = await PrintingSaleServices.updateSalePaymentStatus(
     req.params.id,
     req.body.paymentStatus,
+    req.user?._id,
   );
 
   sendResponse(res, {
@@ -66,12 +67,39 @@ const deleteSale = catchAsync(async (req, res) => {
 });
 
 const updateSale = catchAsync(async (req, res) => {
-  const result = await PrintingSaleServices.updateSale(req.params.id, req.body);
+  const result = await PrintingSaleServices.updateSale(
+    req.params.id,
+    req.body,
+    req.user?._id,
+  );
 
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,
     message: "Printing sale updated successfully",
+    data: result,
+  });
+});
+
+const getArchiveSummary = catchAsync(async (req, res) => {
+  const year = req.query.year ? Number(req.query.year) : undefined;
+  const result = await PrintingSaleServices.getArchiveSummary(year);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Printing sale archive summary retrieved successfully",
+    data: result,
+  });
+});
+
+const getArchiveYears = catchAsync(async (req, res) => {
+  const result = await PrintingSaleServices.getArchiveYears();
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Printing sale archive years retrieved successfully",
     data: result,
   });
 });
@@ -83,4 +111,6 @@ export const PrintingSaleControllers = {
   updatePaymentStatus,
   updateSale,
   deleteSale,
+  getArchiveSummary,
+  getArchiveYears,
 };

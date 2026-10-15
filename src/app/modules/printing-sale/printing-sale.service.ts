@@ -1,6 +1,11 @@
 import { PrintingSale } from "./printing-sale.model";
-import { TPrintingSale } from "./printing-sale.interface";
+import {
+  TPrintingSale,
+  TPrintingSaleArchiveMonthSummary,
+  TPrintingSaleArchiveSummary,
+} from "./printing-sale.interface";
 import { getNextInvoiceSerial } from "../../utils/counter";
+import { PaymentLogServices } from "../payment-log/payment-log.service";
 
 // Sales created before invoice serials existed have none. Give each one the
 // next number from the shared order/sale monthly counter for the month it was
@@ -58,6 +63,12 @@ const createSale = async (payload: TPrintingSale) => {
     totalPrice,
     invoiceSerial: await getNextInvoiceSerial(),
   });
+  await PaymentLogServices.logSalePaymentChange({}, result, {
+    event: "created",
+    source: "admin",
+    performedBy: payload.createdBy,
+    note: "Sale created",
+  });
   return result;
 };
 
@@ -79,8 +90,30 @@ const getAllSales = async (query: Record<string, unknown>) => {
     ];
   }
 
-  if (query.paymentStatus && query.paymentStatus !== "all") {
+  const archiveYear = query.year ? Number(query.year) : undefined;
+  const archiveMonth = query.month ? Number(query.month) : undefined;
+  const isArchiveView = archiveYear !== undefined && archiveMonth !== undefined;
+
+  if (isArchiveView) {
+    // Archive is paid-only by definition — ignore any client-supplied
+    // paymentStatus so a stray param can't leak unpaid sales in.
+    // Bucketed by the month the sale was CREATED (same month its invoice
+    // serial was issued in), not the month it was marked paid.
+    filter.paymentStatus = "paid";
+    filter.createdAt = {
+      $gte: new Date(archiveYear, archiveMonth - 1, 1),
+      $lte: new Date(archiveYear, archiveMonth, 0, 23, 59, 59, 999),
+    };
+  } else if (
+    query.paymentStatus &&
+    query.paymentStatus !== "all" &&
+    query.paymentStatus !== "paid"
+  ) {
     filter.paymentStatus = query.paymentStatus;
+  } else {
+    // Active list default: paid sales now live only in the archive. Covers
+    // both "no filter" and a stray ?paymentStatus=paid.
+    filter.paymentStatus = { $ne: "paid" };
   }
 
   const [result, total] = await Promise.all([
@@ -117,16 +150,29 @@ const getSingleSale = async (id: string) => {
 const updateSalePaymentStatus = async (
   id: string,
   paymentStatus: string,
+  performedBy?: string,
 ) => {
+  const before = await PrintingSale.findById(id).lean();
   const result = await PrintingSale.findByIdAndUpdate(
     id,
     { paymentStatus },
     { new: true },
   );
+  if (before && result) {
+    await PaymentLogServices.logSalePaymentChange(
+      PaymentLogServices.salePaymentSnapshot(before),
+      result,
+      { source: "admin", performedBy },
+    );
+  }
   return result;
 };
 
-const updateSale = async (id: string, payload: Partial<TPrintingSale>) => {
+const updateSale = async (
+  id: string,
+  payload: Partial<TPrintingSale>,
+  performedBy?: string,
+) => {
   // The invoice serial and sale number are assigned once at creation and
   // must never change, since they are already printed on handed-out invoices.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -143,15 +189,97 @@ const updateSale = async (id: string, payload: Partial<TPrintingSale>) => {
     updateData = { ...updateData, items, totalPrice };
   }
 
+  const before = await PrintingSale.findById(id).lean();
   const result = await PrintingSale.findByIdAndUpdate(id, updateData, {
     new: true,
   });
+  if (before && result) {
+    // Logs a status change, or a total edited while the sale is paid.
+    await PaymentLogServices.logSalePaymentChange(
+      PaymentLogServices.salePaymentSnapshot(before),
+      result,
+      { source: "admin", performedBy },
+    );
+  }
   return result;
 };
 
 const deleteSale = async (id: string) => {
   const result = await PrintingSale.findByIdAndDelete(id);
   return result;
+};
+
+const getArchiveSummary = async (
+  year?: number,
+): Promise<TPrintingSaleArchiveSummary> => {
+  const targetYear = year || new Date().getFullYear();
+  const startOfYear = new Date(targetYear, 0, 1);
+  const endOfYear = new Date(targetYear, 11, 31, 23, 59, 59, 999);
+
+  // Bucketed by createdAt — matches getAllSales' archive-view filter above.
+  const raw = await PrintingSale.aggregate([
+    {
+      $match: {
+        paymentStatus: "paid",
+        createdAt: { $gte: startOfYear, $lte: endOfYear },
+      },
+    },
+    {
+      $group: {
+        _id: { $month: "$createdAt" },
+        saleCount: { $sum: 1 },
+        totalAmount: { $sum: "$totalPrice" },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+  const rawByMonth = new Map(raw.map((r) => [r._id, r]));
+
+  const months: TPrintingSaleArchiveMonthSummary[] = monthNames.map(
+    (monthName, idx) => {
+      const m = rawByMonth.get(idx + 1);
+      return {
+        month: idx + 1,
+        monthName,
+        saleCount: m?.saleCount || 0,
+        totalAmount: m?.totalAmount || 0,
+      };
+    },
+  );
+
+  const totals = months.reduce(
+    (acc, m) => ({
+      saleCount: acc.saleCount + m.saleCount,
+      totalAmount: acc.totalAmount + m.totalAmount,
+    }),
+    { saleCount: 0, totalAmount: 0 },
+  );
+
+  return { year: targetYear, months, totals };
+};
+
+const getArchiveYears = async (): Promise<number[]> => {
+  const years = await PrintingSale.aggregate([
+    { $match: { paymentStatus: "paid" } },
+    { $group: { _id: { $year: "$createdAt" } } },
+    { $sort: { _id: -1 } },
+  ]);
+  return years.map((y) => y._id as number);
 };
 
 export const PrintingSaleServices = {
@@ -161,4 +289,6 @@ export const PrintingSaleServices = {
   updateSalePaymentStatus,
   updateSale,
   deleteSale,
+  getArchiveSummary,
+  getArchiveYears,
 };

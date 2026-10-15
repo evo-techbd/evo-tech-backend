@@ -97,6 +97,9 @@ const printingSaleSchema = new Schema<TPrintingSale>(
 );
 
 printingSaleSchema.index({ invoiceSerial: 1 });
+// Serves both the active list (unpaid, newest first) and the archive view
+// (paid sales scoped to a createdAt month range).
+printingSaleSchema.index({ paymentStatus: 1, createdAt: -1 });
 
 export const PrintingSale = model<TPrintingSale>(
   "PrintingSale",

@@ -95,7 +95,11 @@ const getSingleOrder = catchAsync(async (req, res) => {
 
 const updateOrderStatus = catchAsync(async (req, res) => {
   const { id } = req.params;
-  const result = await OrderServices.updateOrderStatusIntoDB(id, req.body);
+  const result = await OrderServices.updateOrderStatusIntoDB(
+    id,
+    req.body,
+    req.user?._id,
+  );
 
   sendResponse(res, {
     success: true,

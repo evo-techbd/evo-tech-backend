@@ -10,7 +10,7 @@ const sendResponse_1 = __importDefault(require("../../utils/sendResponse"));
 const order_service_1 = require("./order.service");
 const placeOrder = (0, catchAsync_1.catchAsync)(async (req, res) => {
     const userUuid = req.user.uuid;
-    const result = await order_service_1.OrderServices.placeOrderIntoDB(req.body, userUuid);
+    const result = await order_service_1.OrderServices.placeOrderIntoDB(req.body, userUuid, req.user.userId);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_1.default.CREATED,
@@ -73,7 +73,7 @@ const getSingleOrder = (0, catchAsync_1.catchAsync)(async (req, res) => {
 });
 const updateOrderStatus = (0, catchAsync_1.catchAsync)(async (req, res) => {
     const { id } = req.params;
-    const result = await order_service_1.OrderServices.updateOrderStatusIntoDB(id, req.body);
+    const result = await order_service_1.OrderServices.updateOrderStatusIntoDB(id, req.body, req.user?._id);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_1.default.OK,

@@ -145,14 +145,22 @@ interface DepositBreakdown {
 
 const roundToTwo = (value: number) => Math.round(value * 100) / 100;
 
-// Unit price the customer is charged. Group Buy items sell at their
-// preOrderPrice — the same rule the storefront uses when adding to cart.
-const getUnitSellingPrice = (product: any): number =>
-  product?.isPreOrder &&
+// Group Buy is live only while the admin toggle is on and the Group Buy price
+// is a real discount — mirrors frontend/utils/product-pricing.ts.
+const isGroupBuyActive = (product: any): boolean =>
+  product?.isPreOrder === true &&
   typeof product.preOrderPrice === "number" &&
-  product.preOrderPrice > 0
-    ? product.preOrderPrice
-    : product?.price || 0;
+  product.preOrderPrice > 0 &&
+  product.preOrderPrice < (product.price || 0);
+
+// A cart line is a Group Buy line only when the customer chose Group Buy and
+// it is still live on the product; anything else is a normal purchase.
+const isGroupBuyLine = (product: any, item: any): boolean =>
+  item?.item_isPreOrder === true && isGroupBuyActive(product);
+
+// Unit price the customer is charged for a line.
+const getUnitSellingPrice = (product: any, isGroupBuy: boolean): number =>
+  isGroupBuy ? product.preOrderPrice : product?.price || 0;
 
 // Subtotal and discount are derived server-side from product prices and the
 // coupon — never taken from the request body, since they feed both what the
@@ -232,16 +240,16 @@ const resolveDeliveryCharge = async (
 };
 
 const calculateDepositBreakdown = (
-  productDetails: Array<{ product: any; quantity: number }>,
+  productDetails: Array<{ quantity: number; isGroupBuy: boolean; subtotal: number }>,
   totalPayable: number,
 ): DepositBreakdown => {
   let preOrderItemsCount = 0;
   let preOrderSubtotal = 0;
 
-  productDetails.forEach(({ product, quantity }) => {
-    if (product?.isPreOrder) {
+  productDetails.forEach(({ quantity, isGroupBuy, subtotal }) => {
+    if (isGroupBuy) {
       preOrderItemsCount += quantity;
-      preOrderSubtotal += getUnitSellingPrice(product) * quantity;
+      preOrderSubtotal += subtotal;
     }
   });
 
@@ -325,8 +333,8 @@ const placeOrderIntoDB = async (
     if (!product) {
       throw new AppError(httpStatus.NOT_FOUND, `Product not found`);
     }
-    // Skip stock validation for preorder items
-    if (!product.isPreOrder) {
+    // Skip stock validation for Group Buy lines
+    if (!isGroupBuyLine(product, item)) {
       const requestedQty = item.item_quantity;
       const availableStock = product.stock ?? 0;
 
@@ -346,11 +354,15 @@ const placeOrderIntoDB = async (
       if (!product) {
         throw new AppError(httpStatus.NOT_FOUND, `Product not found`);
       }
+      const isGroupBuy = isGroupBuyLine(product, item);
+      const unitPrice = getUnitSellingPrice(product, isGroupBuy);
       return {
         product,
         quantity: item.item_quantity,
         selectedColor: item.item_color || "",
-        subtotal: getUnitSellingPrice(product) * item.item_quantity,
+        isGroupBuy,
+        unitPrice,
+        subtotal: unitPrice * item.item_quantity,
       };
     }),
   );
@@ -425,7 +437,7 @@ const placeOrderIntoDB = async (
     order: order._id,
     product: detail.product._id,
     productName: detail.product.name,
-    productPrice: getUnitSellingPrice(detail.product),
+    productPrice: detail.unitPrice,
     buyingPrice: detail.product.buyingPrice || 0,
     quantity: detail.quantity,
     selectedColor: detail.selectedColor,
@@ -936,8 +948,8 @@ const placeGuestOrderIntoDB = async (
     if (!product) {
       throw new AppError(httpStatus.NOT_FOUND, `Product not found`);
     }
-    // Skip stock validation for preorder items
-    if (!product.isPreOrder) {
+    // Skip stock validation for Group Buy lines
+    if (!isGroupBuyLine(product, item)) {
       const requestedQty = item.item_quantity || item.quantity;
       const availableStock = product.stock ?? 0;
 
@@ -966,13 +978,16 @@ const placeGuestOrderIntoDB = async (
       if (!product) {
         throw new AppError(httpStatus.NOT_FOUND, `Product not found`);
       }
-      const itemTotal =
-        getUnitSellingPrice(product) * (item.item_quantity || item.quantity);
+      const isGroupBuy = isGroupBuyLine(product, item);
+      const unitPrice = getUnitSellingPrice(product, isGroupBuy);
+      const quantity = item.item_quantity || item.quantity;
       return {
         product,
-        quantity: item.item_quantity || item.quantity,
+        quantity,
         selectedColor: item.item_color || item.selectedColor,
-        subtotal: itemTotal,
+        isGroupBuy,
+        unitPrice,
+        subtotal: unitPrice * quantity,
       };
     }),
   );
@@ -1048,7 +1063,7 @@ const placeGuestOrderIntoDB = async (
     order: order._id,
     product: detail.product._id,
     productName: detail.product.name,
-    productPrice: getUnitSellingPrice(detail.product),
+    productPrice: detail.unitPrice,
     buyingPrice: detail.product.buyingPrice || 0,
     quantity: detail.quantity,
     selectedColor: detail.selectedColor,

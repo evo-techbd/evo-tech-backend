@@ -8,10 +8,15 @@ const express_1 = __importDefault(require("express"));
 const auth_1 = __importDefault(require("../../middlewares/auth"));
 const printing_sale_controller_1 = require("./printing-sale.controller");
 const user_constant_1 = require("../user/user.constant");
+const payment_log_controller_1 = require("../payment-log/payment-log.controller");
 const router = express_1.default.Router();
 router.post("/", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN), printing_sale_controller_1.PrintingSaleControllers.createSale);
 router.get("/", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN), printing_sale_controller_1.PrintingSaleControllers.getAllSales);
+// Must be registered before "/:id" so "archive" isn't treated as a sale id.
+router.get("/archive/summary", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN), printing_sale_controller_1.PrintingSaleControllers.getArchiveSummary);
+router.get("/archive/years", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN), printing_sale_controller_1.PrintingSaleControllers.getArchiveYears);
 router.get("/:id", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN), printing_sale_controller_1.PrintingSaleControllers.getSingleSale);
+router.get("/:id/payment-logs", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN), payment_log_controller_1.PaymentLogControllers.getPrintingSalePaymentLogs);
 router.patch("/:id", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN), printing_sale_controller_1.PrintingSaleControllers.updateSale);
 router.patch("/:id/payment-status", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN), printing_sale_controller_1.PrintingSaleControllers.updatePaymentStatus);
 router.delete("/:id", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN), printing_sale_controller_1.PrintingSaleControllers.deleteSale);

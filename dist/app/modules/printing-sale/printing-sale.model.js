@@ -30,6 +30,11 @@ const printingSaleSchema = new mongoose_1.Schema({
         unique: true,
         default: () => `PS-${Date.now()}-${(0, uuid_1.v4)().substring(0, 4).toUpperCase()}`,
     },
+    invoiceSerial: {
+        // Resets every month (e.g. "09001"), so it is NOT unique across the
+        // whole collection � only within the month it was issued.
+        type: String,
+    },
     customerName: {
         type: String,
         required: true,
@@ -83,5 +88,9 @@ const printingSaleSchema = new mongoose_1.Schema({
 }, {
     timestamps: true,
 });
+printingSaleSchema.index({ invoiceSerial: 1 });
+// Serves both the active list (unpaid, newest first) and the archive view
+// (paid sales scoped to a createdAt month range).
+printingSaleSchema.index({ paymentStatus: 1, createdAt: -1 });
 exports.PrintingSale = (0, mongoose_1.model)("PrintingSale", printingSaleSchema);
 //# sourceMappingURL=printing-sale.model.js.map

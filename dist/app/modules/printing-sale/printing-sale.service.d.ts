@@ -1,4 +1,4 @@
-import { TPrintingSale } from "./printing-sale.interface";
+import { TPrintingSale, TPrintingSaleArchiveSummary } from "./printing-sale.interface";
 export declare const PrintingSaleServices: {
     createSale: (payload: TPrintingSale) => Promise<import("mongoose").Document<unknown, {}, TPrintingSale, {}, {}> & TPrintingSale & Required<{
         _id: string;
@@ -15,6 +15,7 @@ export declare const PrintingSaleServices: {
         result: (import("mongoose").FlattenMaps<{
             _id?: string | undefined;
             saleNumber: string;
+            invoiceSerial?: string | undefined;
             customerName: string;
             phone: string;
             email?: string | undefined;
@@ -42,6 +43,7 @@ export declare const PrintingSaleServices: {
     getSingleSale: (id: string) => Promise<(import("mongoose").FlattenMaps<{
         _id?: string | undefined;
         saleNumber: string;
+        invoiceSerial?: string | undefined;
         customerName: string;
         phone: string;
         email?: string | undefined;
@@ -65,12 +67,12 @@ export declare const PrintingSaleServices: {
     }> & {
         __v: number;
     }) | null>;
-    updateSalePaymentStatus: (id: string, paymentStatus: string) => Promise<(import("mongoose").Document<unknown, {}, TPrintingSale, {}, {}> & TPrintingSale & Required<{
+    updateSalePaymentStatus: (id: string, paymentStatus: string, performedBy?: string) => Promise<(import("mongoose").Document<unknown, {}, TPrintingSale, {}, {}> & TPrintingSale & Required<{
         _id: string;
     }> & {
         __v: number;
     }) | null>;
-    updateSale: (id: string, payload: Partial<TPrintingSale>) => Promise<(import("mongoose").Document<unknown, {}, TPrintingSale, {}, {}> & TPrintingSale & Required<{
+    updateSale: (id: string, payload: Partial<TPrintingSale>, performedBy?: string) => Promise<(import("mongoose").Document<unknown, {}, TPrintingSale, {}, {}> & TPrintingSale & Required<{
         _id: string;
     }> & {
         __v: number;
@@ -80,5 +82,7 @@ export declare const PrintingSaleServices: {
     }> & {
         __v: number;
     }) | null>;
+    getArchiveSummary: (year?: number) => Promise<TPrintingSaleArchiveSummary>;
+    getArchiveYears: () => Promise<number[]>;
 };
 //# sourceMappingURL=printing-sale.service.d.ts.map

@@ -5,5 +5,7 @@ export declare const PrintingSaleControllers: {
     updatePaymentStatus: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
     updateSale: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
     deleteSale: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    getArchiveSummary: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
+    getArchiveYears: (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => Promise<void>;
 };
 //# sourceMappingURL=printing-sale.controller.d.ts.map

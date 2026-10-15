@@ -22,7 +22,11 @@ const allowedOrigins = Array.isArray(config_1.default.cors_origin)
     : [];
 // Log allowed origins for debugging
 console.log("Allowed CORS Origins:", allowedOrigins);
-app.use((0, cors_1.default)({
+// EPS returns the customer's browser via a top-level navigation (possibly a
+// cross-site form POST carrying the gateway's Origin). That is not a CORS
+// request, so rejecting the origin would only break the payment return.
+const isEpsCallback = (path) => path.includes("/payment/eps/callback/");
+const corsMiddleware = (0, cors_1.default)({
     origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps or Postman)
         if (!origin)
@@ -59,7 +63,8 @@ app.use((0, cors_1.default)({
     ],
     exposedHeaders: ["Content-Length", "X-Requested-With"],
     maxAge: 86400, // 24 hours
-}));
+});
+app.use((req, res, next) => isEpsCallback(req.path) ? next() : corsMiddleware(req, res, next));
 // Handle preflight requests explicitly
 app.options("*", (0, cors_1.default)());
 app.use((0, cookie_parser_1.default)());

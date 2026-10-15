@@ -11,56 +11,8 @@ const payment_service_1 = __importDefault(require("./payment.service"));
 const config_1 = __importDefault(require("../../config"));
 const order_model_1 = require("../order/order.model");
 const AppError_1 = __importDefault(require("../../errors/AppError"));
-const toTwoDecimals = (value) => Math.round(value * 100) / 100;
-const getOutstandingAmounts = (order) => {
-    const depositDue = order.depositDue ?? 0;
-    const depositPaid = order.depositPaid ?? 0;
-    const balanceDue = order.balanceDue ?? Math.max((order.totalPayable ?? 0) - depositDue, 0);
-    const balancePaid = order.balancePaid ?? 0;
-    return {
-        depositOutstanding: Math.max(depositDue - depositPaid, 0),
-        balanceOutstanding: Math.max(balanceDue - balancePaid, 0),
-    };
-};
-const applyPaymentProgress = (order, paymentAmount) => {
-    let remaining = paymentAmount;
-    const depositDue = order.depositDue ?? 0;
-    const balanceDue = order.balanceDue ?? Math.max((order.totalPayable ?? 0) - depositDue, 0);
-    const depositPaid = order.depositPaid ?? 0;
-    const balancePaid = order.balancePaid ?? 0;
-    order.depositStatus =
-        order.depositStatus || (depositDue > 0 ? "pending" : "paid");
-    order.balanceStatus =
-        order.balanceStatus || (balanceDue > 0 ? "pending" : "paid");
-    const depositOutstanding = Math.max(depositDue - depositPaid, 0);
-    if (depositOutstanding > 0 && remaining > 0) {
-        const applied = Math.min(remaining, depositOutstanding);
-        order.depositPaid = toTwoDecimals(depositPaid + applied);
-        remaining -= applied;
-        if (Math.max(depositDue - order.depositPaid, 0) <= 0.01) {
-            order.depositStatus = "paid";
-        }
-    }
-    const balanceOutstanding = Math.max(balanceDue - (order.balancePaid ?? 0), 0);
-    if (remaining > 0 && balanceOutstanding > 0) {
-        const applied = Math.min(remaining, balanceOutstanding);
-        order.balancePaid = toTwoDecimals(balancePaid + applied);
-        remaining -= applied;
-        if (Math.max(balanceDue - order.balancePaid, 0) <= 0.01) {
-            order.balanceStatus = "paid";
-        }
-    }
-    if ((depositDue === 0 || order.depositStatus === "paid") &&
-        order.balanceStatus === "paid") {
-        order.paymentStatus = "paid";
-    }
-    else if ((order.depositPaid ?? 0) > 0 || (order.balancePaid ?? 0) > 0) {
-        order.paymentStatus = "partial";
-    }
-    else {
-        order.paymentStatus = "pending";
-    }
-};
+const payment_utils_1 = require("./payment.utils");
+const payment_log_service_1 = require("../payment-log/payment-log.service");
 /**
  * Create a bKash payment
  */
@@ -75,7 +27,7 @@ const createBkashPayment = (0, catchAsync_1.catchAsync)(async (req, res) => {
     if (order.bkashPaymentID) {
         throw new AppError_1.default(http_status_1.default.BAD_REQUEST, "Payment already initiated for this order");
     }
-    const { depositOutstanding, balanceOutstanding } = getOutstandingAmounts(order);
+    const { depositOutstanding, balanceOutstanding } = (0, payment_utils_1.getOutstandingAmounts)(order);
     let amountToCharge = depositOutstanding > 0 ? depositOutstanding : balanceOutstanding;
     if (!amountToCharge || amountToCharge <= 0) {
         throw new AppError_1.default(http_status_1.default.BAD_REQUEST, "No outstanding amount due for this order");
@@ -84,7 +36,7 @@ const createBkashPayment = (0, catchAsync_1.catchAsync)(async (req, res) => {
         mode: "0011",
         payerReference: order.phone || "01619777283",
         callbackURL: `${config_1.default.frontend_url}/payment/callback`,
-        amount: toTwoDecimals(amountToCharge).toFixed(2),
+        amount: (0, payment_utils_1.toTwoDecimals)(amountToCharge).toFixed(2),
         currency: "BDT",
         intent: "sale",
         merchantInvoiceNumber: order.orderNumber || orderId,
@@ -117,13 +69,19 @@ const executeBkashPayment = (0, catchAsync_1.catchAsync)(async (req, res) => {
     if (!order) {
         throw new AppError_1.default(http_status_1.default.NOT_FOUND, "Order not found");
     }
+    const paymentBefore = payment_log_service_1.PaymentLogServices.orderPaymentSnapshot(order);
     order.bkashTransactionId = result.trxID;
     order.paymentMethod = "bkash";
     if (result.transactionStatus === "Completed") {
         const paidAmount = Number(result.amount) || 0;
-        applyPaymentProgress(order, paidAmount);
+        (0, payment_utils_1.applyPaymentProgress)(order, paidAmount);
     }
     await order.save();
+    await payment_log_service_1.PaymentLogServices.logOrderPaymentChange(paymentBefore, order, {
+        source: "gateway",
+        method: "bkash",
+        transactionId: result.trxID,
+    });
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.OK,
         success: true,
@@ -149,6 +107,12 @@ const queryBkashPayment = (0, catchAsync_1.catchAsync)(async (req, res) => {
         data: result,
     });
 });
+// findOneAndUpdate returns the order as it was before being marked failed.
+const logBkashFailure = async (previous, note) => {
+    if (!previous)
+        return;
+    await payment_log_service_1.PaymentLogServices.logOrderPaymentChange(payment_log_service_1.PaymentLogServices.orderPaymentSnapshot(previous), { ...previous.toObject(), paymentStatus: "failed" }, { source: "gateway", method: "bkash", note });
+};
 /**
  * Handle bKash callback (success/failure/cancel)
  */
@@ -160,12 +124,18 @@ const handleBkashCallback = (0, catchAsync_1.catchAsync)(async (req, res) => {
         // Find order by payment ID and update
         const order = await order_model_1.Order.findOne({ bkashPaymentID: paymentID });
         if (order) {
+            const paymentBefore = payment_log_service_1.PaymentLogServices.orderPaymentSnapshot(order);
             order.bkashTransactionId = paymentStatus.trxID || "";
             if (paymentStatus.transactionStatus === "Completed") {
                 const paidAmount = Number(paymentStatus.amount) || 0;
-                applyPaymentProgress(order, paidAmount);
+                (0, payment_utils_1.applyPaymentProgress)(order, paidAmount);
             }
             await order.save();
+            await payment_log_service_1.PaymentLogServices.logOrderPaymentChange(paymentBefore, order, {
+                source: "gateway",
+                method: "bkash",
+                transactionId: paymentStatus.trxID,
+            });
         }
         // Redirect to success page
         res.redirect(`${config_1.default.frontend_url}/order/${order?.orderNumber}?status=success`);
@@ -173,14 +143,16 @@ const handleBkashCallback = (0, catchAsync_1.catchAsync)(async (req, res) => {
     else if (status === "failure") {
         // Mark the associated order's payment as failed
         if (paymentID) {
-            await order_model_1.Order.findOneAndUpdate({ bkashPaymentID: paymentID }, { paymentStatus: "failed" });
+            const previous = await order_model_1.Order.findOneAndUpdate({ bkashPaymentID: paymentID }, { paymentStatus: "failed" });
+            await logBkashFailure(previous, "bKash payment failed");
         }
         res.redirect(`${config_1.default.frontend_url}/checkout?status=failure`);
     }
     else if (status === "cancel") {
         // Mark the associated order's payment as failed (user cancelled payment)
         if (paymentID) {
-            await order_model_1.Order.findOneAndUpdate({ bkashPaymentID: paymentID }, { paymentStatus: "failed" });
+            const previous = await order_model_1.Order.findOneAndUpdate({ bkashPaymentID: paymentID }, { paymentStatus: "failed" });
+            await logBkashFailure(previous, "bKash payment cancelled by customer");
         }
         res.redirect(`${config_1.default.frontend_url}/checkout?status=cancel`);
     }
@@ -202,12 +174,18 @@ const handleBkashWebhook = (0, catchAsync_1.catchAsync)(async (req, res) => {
             bkashPaymentID: webhookData.paymentID,
         });
         if (order) {
+            const paymentBefore = payment_log_service_1.PaymentLogServices.orderPaymentSnapshot(order);
             order.bkashTransactionId = paymentStatus.trxID || "";
             if (paymentStatus.transactionStatus === "Completed") {
                 const paidAmount = Number(paymentStatus.amount) || 0;
-                applyPaymentProgress(order, paidAmount);
+                (0, payment_utils_1.applyPaymentProgress)(order, paidAmount);
             }
             await order.save();
+            await payment_log_service_1.PaymentLogServices.logOrderPaymentChange(paymentBefore, order, {
+                source: "gateway",
+                method: "bkash",
+                transactionId: paymentStatus.trxID,
+            });
         }
     }
     (0, sendResponse_1.default)(res, {

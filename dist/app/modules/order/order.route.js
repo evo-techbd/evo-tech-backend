@@ -8,6 +8,7 @@ const express_1 = __importDefault(require("express"));
 const order_controller_1 = require("./order.controller");
 const auth_1 = __importDefault(require("../../middlewares/auth"));
 const user_constant_1 = require("../user/user.constant");
+const payment_log_controller_1 = require("../payment-log/payment-log.controller");
 const router = express_1.default.Router();
 // Public routes - no auth required
 router.post("/guest", order_controller_1.OrderControllers.placeGuestOrder);
@@ -21,6 +22,7 @@ router.get("/archive/summary", (0, auth_1.default)(user_constant_1.USER_ROLE.ADM
 router.get("/archive/years", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN, user_constant_1.USER_ROLE.EMPLOYEE), order_controller_1.OrderControllers.getOrderArchiveYears);
 router.get("/:id", (0, auth_1.default)(user_constant_1.USER_ROLE.USER, user_constant_1.USER_ROLE.ADMIN), order_controller_1.OrderControllers.getSingleOrder);
 router.get("/:id/items-for-review", (0, auth_1.default)(user_constant_1.USER_ROLE.USER, user_constant_1.USER_ROLE.ADMIN), order_controller_1.OrderControllers.getOrderItemsForReview);
+router.get("/:id/payment-logs", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN, user_constant_1.USER_ROLE.EMPLOYEE), payment_log_controller_1.PaymentLogControllers.getOrderPaymentLogs);
 router.put("/:id", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN, user_constant_1.USER_ROLE.EMPLOYEE), order_controller_1.OrderControllers.updateOrderStatus);
 router.delete("/:id", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN), order_controller_1.OrderControllers.deleteOrder);
 exports.OrderRoutes = router;

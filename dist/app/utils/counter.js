@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ensureInvoiceSerialAtLeast = exports.getNextInvoiceSerial = exports.ensureSequenceAtLeast = exports.getNextSequence = void 0;
+exports.ensureInvoiceSerialAtLeast = exports.getNextInvoiceSerial = exports.formatInvoiceSerial = exports.ensureSequenceAtLeast = exports.getNextSequence = void 0;
 const mongoose_1 = require("mongoose");
 const counterSchema = new mongoose_1.Schema({
     _id: { type: String, required: true },
@@ -21,21 +21,22 @@ const ensureSequenceAtLeast = async (name, value) => {
     await Counter.findByIdAndUpdate(name, { $max: { seq: value } }, { upsert: true });
 };
 exports.ensureSequenceAtLeast = ensureSequenceAtLeast;
-// Invoice serials reset every calendar month, shop-style: MM + a 3-digit
-// sequence, e.g. 09001, 09002, ... then 06001 the following June. The
-// counter is keyed by year+month internally so two different Septembers a
-// year apart never collide, even though only the month shows up in the
-// printed number. The full formatted string (not just the running number)
-// is what gets stored on the order, so printing it never depends on
-// re-deriving the month from createdAt later.
+// Invoice serials reset every calendar month, shop-style: YY + MM + a 3-digit
+// sequence, e.g. 2610001, 2610002, ... then 2611001 the following month. The
+// counter is keyed by year+month so each month starts again from 001. The
+// full formatted string (not just the running number) is what gets stored on
+// the order, so printing it never depends on re-deriving the month from
+// createdAt later.
 const getMonthlyInvoiceSerialKey = (date) => `invoiceSerial-${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 const formatInvoiceSerial = (date, sequence) => {
+    const year = String(date.getFullYear() % 100).padStart(2, "0");
     const month = String(date.getMonth() + 1).padStart(2, "0");
-    return `${month}${String(sequence).padStart(3, "0")}`;
+    return `${year}${month}${String(sequence).padStart(3, "0")}`;
 };
+exports.formatInvoiceSerial = formatInvoiceSerial;
 const getNextInvoiceSerial = async (date = new Date()) => {
     const sequence = await (0, exports.getNextSequence)(getMonthlyInvoiceSerialKey(date));
-    return formatInvoiceSerial(date, sequence);
+    return (0, exports.formatInvoiceSerial)(date, sequence);
 };
 exports.getNextInvoiceSerial = getNextInvoiceSerial;
 const ensureInvoiceSerialAtLeast = async (date, value) => (0, exports.ensureSequenceAtLeast)(getMonthlyInvoiceSerialKey(date), value);

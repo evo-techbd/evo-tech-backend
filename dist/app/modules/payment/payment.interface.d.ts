@@ -88,4 +88,63 @@ export interface BkashRefundResponse {
     currency: string;
     charge: string;
 }
+export interface EpsConfig {
+    base_url: string;
+    username: string;
+    password: string;
+    hash_key: string;
+    merchant_id: string;
+    store_id: string;
+}
+export interface EpsGetTokenResponse {
+    token: string;
+    expireDate: string;
+    errorMessage: string | null;
+    errorCode: string | null;
+}
+export interface EpsProductItem {
+    ProductName: string;
+    NoOfItem: string;
+    ProductProfile: string;
+    ProductCategory: string;
+    ProductPrice: string;
+}
+export interface EpsInitializeParams {
+    customerOrderId: string;
+    merchantTransactionId: string;
+    totalAmount: number;
+    successUrl: string;
+    failUrl: string;
+    cancelUrl: string;
+    customerName: string;
+    customerEmail: string;
+    customerAddress: string;
+    customerCity: string;
+    customerState: string;
+    customerPostcode: string;
+    customerPhone: string;
+    productName: string;
+    noOfItem: number;
+    productList: EpsProductItem[];
+    ipAddress?: string;
+    valueA?: string;
+}
+export interface EpsInitializeResponse {
+    TransactionId: string;
+    RedirectURL: string;
+    ErrorMessage: string | null;
+    ErrorCode: string | null;
+}
+export interface EpsVerifyResponse {
+    MerchantTransactionId: string;
+    EPSTransactionId: string;
+    Status: string;
+    TotalAmount: string;
+    StoreAmount?: string;
+    TransactionDate: string;
+    FinancialEntity: string | null;
+    ValueA?: string;
+    ErrorMessage: string | null;
+    ErrorCode: string | null;
+}
 //# sourceMappingURL=payment.interface.d.ts.map

@@ -4,7 +4,8 @@ export declare const normalizeOrderObject: (orderDoc: any) => any;
 export declare const OrderServices: {
     placeOrderIntoDB: (payload: TOrder & {
         items: any[];
-    }, userUuid: string) => Promise<{
+        couponCode?: string;
+    }, userUuid: string, couponUserId?: string) => Promise<{
         order: any;
         items: (mongoose.Document<unknown, {}, TOrderItem, {}, {}> & TOrderItem & Required<{
             _id: string;
@@ -14,6 +15,7 @@ export declare const OrderServices: {
     }>;
     placeGuestOrderIntoDB: (payload: TOrder & {
         items: any[];
+        couponCode?: string;
     }) => Promise<{
         order: any;
         items: (mongoose.Document<unknown, {}, TOrderItem, {}, {}> & TOrderItem & Required<{
@@ -52,7 +54,7 @@ export declare const OrderServices: {
             __v: number;
         })[];
     }>;
-    updateOrderStatusIntoDB: (orderId: string, payload: Partial<TOrder>) => Promise<(mongoose.Document<unknown, {}, TOrder, {}, {}> & TOrder & Required<{
+    updateOrderStatusIntoDB: (orderId: string, payload: Partial<TOrder>, performedBy?: string) => Promise<(mongoose.Document<unknown, {}, TOrder, {}, {}> & TOrder & Required<{
         _id: string;
     }> & {
         __v: number;
@@ -66,8 +68,8 @@ export declare const OrderServices: {
         order: {
             orderNumber: string;
             trackingCode: string | undefined;
-            orderStatus: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
-            paymentStatus: "partial" | "pending" | "paid" | "failed" | "refunded";
+            orderStatus: "cancelled" | "pending" | "confirmed" | "processing" | "shipped" | "delivered";
+            paymentStatus: "partial" | "failed" | "pending" | "paid" | "refunded";
             paymentMethod: string;
             shippingType: string;
             city: string;

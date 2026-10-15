@@ -49,6 +49,8 @@ const review_model_1 = require("../review/review.model");
 const pickuppoint_model_1 = require("../pickuppoint/pickuppoint.model");
 const settings_service_1 = require("../settings/settings.service");
 const counter_1 = require("../../utils/counter");
+const coupon_service_1 = require("../coupon/coupon.service");
+const payment_log_service_1 = require("../payment-log/payment-log.service");
 const generateOrderNumber = () => {
     const timestamp = Date.now().toString();
     const random = Math.floor(Math.random() * 10000)
@@ -145,6 +147,38 @@ const hydratePickupPointsForOrders = async (orders) => {
     });
 };
 const roundToTwo = (value) => Math.round(value * 100) / 100;
+// Group Buy is live only while the admin toggle is on and the Group Buy price
+// is a real discount — mirrors frontend/utils/product-pricing.ts.
+const isGroupBuyActive = (product) => product?.isPreOrder === true &&
+    typeof product.preOrderPrice === "number" &&
+    product.preOrderPrice > 0 &&
+    product.preOrderPrice < (product.price || 0);
+// A cart line is a Group Buy line only when the customer chose Group Buy and
+// it is still live on the product; anything else is a normal purchase.
+const isGroupBuyLine = (product, item) => item?.item_isPreOrder === true && isGroupBuyActive(product);
+// Unit price the customer is charged for a line.
+const getUnitSellingPrice = (product, isGroupBuy) => isGroupBuy ? product.preOrderPrice : product?.price || 0;
+// Subtotal and discount are derived server-side from product prices and the
+// coupon — never taken from the request body, since they feed both what the
+// customer is charged and every revenue figure on the admin dashboard.
+const resolveOrderPricing = async (productDetails, couponCode, couponUserId) => {
+    const subtotal = roundToTwo(productDetails.reduce((sum, detail) => sum + detail.subtotal, 0));
+    let discount = 0;
+    if (couponCode && couponUserId) {
+        const { discountAmount } = await coupon_service_1.CouponService.validateCoupon(couponCode, couponUserId, subtotal);
+        discount = roundToTwo(discountAmount);
+    }
+    return { subtotal, discount };
+};
+// Payment and fulfilment state always starts fresh; these fields are only
+// changed by verified payment callbacks or by an admin.
+const resetOrderLifecycleFields = (orderData) => {
+    orderData.orderStatus = "pending";
+    orderData.paymentStatus = "pending";
+    orderData.amountPaid = 0;
+    orderData.amountDue = orderData.totalPayable || 0;
+    delete orderData.deliveredAt;
+};
 // Mirrors frontend/utils/essential_functions.ts#getAdditionalChargeforWeight,
 // but reads the charges from admin-configurable settings instead of
 // hardcoded constants, and is the authoritative value saved on the order
@@ -177,14 +211,10 @@ const resolveDeliveryCharge = async (shippingType, city, productDetails) => {
 const calculateDepositBreakdown = (productDetails, totalPayable) => {
     let preOrderItemsCount = 0;
     let preOrderSubtotal = 0;
-    productDetails.forEach(({ product, quantity }) => {
-        if (product?.isPreOrder) {
+    productDetails.forEach(({ quantity, isGroupBuy, subtotal }) => {
+        if (isGroupBuy) {
             preOrderItemsCount += quantity;
-            const unitPrice = typeof product.preOrderPrice === "number" &&
-                !isNaN(product.preOrderPrice)
-                ? product.preOrderPrice
-                : product.price;
-            preOrderSubtotal += unitPrice * quantity;
+            preOrderSubtotal += subtotal;
         }
     });
     const preOrderDepositPortion = preOrderItemsCount > 0 ? preOrderSubtotal * 0.5 : 0;
@@ -203,8 +233,11 @@ const calculateDepositBreakdown = (productDetails, totalPayable) => {
         balanceStatus: balanceDue > 0 ? "pending" : "paid",
     };
 };
-const VALID_PAYMENT_METHODS = ["cod", "cop", "bkash", "bank_transfer"];
+const VALID_PAYMENT_METHODS = ["cod", "cop", "bkash", "bank_transfer", "eps"];
 const CASH_PAYMENT_METHODS = ["cod", "cop"];
+// Paid on a hosted gateway after the order is placed, so there is no
+// customer-entered transaction ID to validate up front.
+const GATEWAY_PAYMENT_METHODS = ["eps"];
 // Letters/digits/hyphen/slash, 6-25 chars, no spaces, must contain at least one digit.
 // Blocks junk like "AmiPorepayKorbo" while still accepting real bKash/bank references.
 const TRANSACTION_ID_REGEX = /^(?=.*\d)[A-Za-z0-9\-/]{6,25}$/;
@@ -213,17 +246,18 @@ const validateOrderPayment = (paymentMethod, transactionId, isPreOrderOrder) => 
         throw new AppError_1.default(http_status_1.default.BAD_REQUEST, "Invalid payment method");
     }
     if (isPreOrderOrder && CASH_PAYMENT_METHODS.includes(paymentMethod)) {
-        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, "Cash on Delivery/Pickup is not available for Group Buy items. Please pay via bKash or Bank Transfer.");
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, "Cash on Delivery/Pickup is not available for Group Buy items. Please pay online, via bKash or Bank Transfer.");
     }
-    if (!CASH_PAYMENT_METHODS.includes(paymentMethod)) {
+    if (!CASH_PAYMENT_METHODS.includes(paymentMethod) &&
+        !GATEWAY_PAYMENT_METHODS.includes(paymentMethod)) {
         const trimmedId = (transactionId || "").trim();
         if (!trimmedId || !TRANSACTION_ID_REGEX.test(trimmedId)) {
             throw new AppError_1.default(http_status_1.default.BAD_REQUEST, "Please provide a valid payment transaction ID.");
         }
     }
 };
-const placeOrderIntoDB = async (payload, userUuid) => {
-    const { items, ...orderData } = payload;
+const placeOrderIntoDB = async (payload, userUuid, couponUserId) => {
+    const { items, couponCode, ...orderData } = payload;
     // Cart is managed in frontend Redux, use items from request body
     if (!items || items.length === 0) {
         throw new AppError_1.default(http_status_1.default.BAD_REQUEST, "Cart is empty");
@@ -234,8 +268,8 @@ const placeOrderIntoDB = async (payload, userUuid) => {
         if (!product) {
             throw new AppError_1.default(http_status_1.default.NOT_FOUND, `Product not found`);
         }
-        // Skip stock validation for preorder items
-        if (!product.isPreOrder) {
+        // Skip stock validation for Group Buy lines
+        if (!isGroupBuyLine(product, item)) {
             const requestedQty = item.item_quantity;
             const availableStock = product.stock ?? 0;
             if (!product.inStock || availableStock < requestedQty) {
@@ -249,13 +283,18 @@ const placeOrderIntoDB = async (payload, userUuid) => {
         if (!product) {
             throw new AppError_1.default(http_status_1.default.NOT_FOUND, `Product not found`);
         }
+        const isGroupBuy = isGroupBuyLine(product, item);
+        const unitPrice = getUnitSellingPrice(product, isGroupBuy);
         return {
             product,
             quantity: item.item_quantity,
             selectedColor: item.item_color || "",
-            subtotal: product.price * item.item_quantity,
+            isGroupBuy,
+            unitPrice,
+            subtotal: unitPrice * item.item_quantity,
         };
     }));
+    Object.assign(orderData, await resolveOrderPricing(productDetails, couponCode, couponUserId));
     // Normalize phone number
     if (orderData.phone) {
         orderData.phone = normalizePhoneNumber(orderData.phone);
@@ -275,18 +314,29 @@ const placeOrderIntoDB = async (payload, userUuid) => {
         (orderData.additionalCharge || 0), 0));
     const depositInfo = calculateDepositBreakdown(productDetails, orderData.totalPayable || 0);
     validateOrderPayment(orderData.paymentMethod, orderData.transactionId, depositInfo.isPreOrderOrder);
+    // Gateway orders get their transaction reference from the verified EPS
+    // callback, never from the client.
+    if (GATEWAY_PAYMENT_METHODS.includes(orderData.paymentMethod)) {
+        orderData.transactionId = undefined;
+    }
     Object.assign(orderData, depositInfo, {
         depositPaid: 0,
         balancePaid: 0,
     });
+    resetOrderLifecycleFields(orderData);
     // Create order
     const order = await order_model_1.Order.create(orderData);
+    await payment_log_service_1.PaymentLogServices.logOrderPaymentChange({}, order, {
+        event: "created",
+        source: "system",
+        note: "Order placed",
+    });
     // Create order items
     const orderItemsData = productDetails.map((detail) => ({
         order: order._id,
         product: detail.product._id,
         productName: detail.product.name,
-        productPrice: detail.product.price,
+        productPrice: detail.unitPrice,
         buyingPrice: detail.product.buyingPrice || 0,
         quantity: detail.quantity,
         selectedColor: detail.selectedColor,
@@ -561,11 +611,12 @@ const getSingleOrderFromDB = async (orderId, userUuid) => {
         items: orderItems,
     };
 };
-const updateOrderStatusIntoDB = async (orderId, payload) => {
+const updateOrderStatusIntoDB = async (orderId, payload, performedBy) => {
     const order = await order_model_1.Order.findById(orderId);
     if (!order) {
         throw new AppError_1.default(http_status_1.default.NOT_FOUND, "Order not found");
     }
+    const paymentBefore = payment_log_service_1.PaymentLogServices.orderPaymentSnapshot(order);
     // If order is being marked as delivered, set deliveredAt
     if (payload.orderStatus === "delivered" && !order.deliveredAt) {
         payload.deliveredAt = new Date();
@@ -609,6 +660,18 @@ const updateOrderStatusIntoDB = async (orderId, payload) => {
                     : "pending";
         }
     }
+    // Marking an order "paid" (e.g. from the status dropdown) without an amount
+    // means the customer settled in full — record it, or cash collected and
+    // amount due would disagree with the status.
+    if (payload.paymentStatus === "paid" && payload.amountPaid === undefined) {
+        payload.amountPaid = payload.totalPayable ?? order.totalPayable ?? 0;
+        if (order.isPreOrderOrder) {
+            payload.depositPaid = payload.depositDue ?? order.depositDue ?? 0;
+            payload.balancePaid = payload.balanceDue ?? order.balanceDue ?? 0;
+            payload.depositStatus = "paid";
+            payload.balanceStatus = "paid";
+        }
+    }
     // Keep amountDue/paymentStatus in sync when financial fields change.
     if (payload.amountPaid !== undefined || payload.totalPayable !== undefined) {
         const totalPayable = payload.totalPayable ?? order.totalPayable ?? 0;
@@ -632,6 +695,16 @@ const updateOrderStatusIntoDB = async (orderId, payload) => {
     const result = await order_model_1.Order.findByIdAndUpdate(orderId, payload, {
         new: true,
     });
+    if (result) {
+        await payment_log_service_1.PaymentLogServices.logOrderPaymentChange(paymentBefore, result, {
+            source: "admin",
+            method: "manual",
+            performedBy,
+            note: payload.orderStatus === "cancelled" && order.orderStatus !== "cancelled"
+                ? "Order cancelled"
+                : undefined,
+        });
+    }
     return result;
 };
 const deleteOrderFromDB = async (orderId, deletedBy) => {
@@ -658,7 +731,9 @@ const deleteOrderFromDB = async (orderId, deletedBy) => {
 };
 // Guest checkout - no authentication required
 const placeGuestOrderIntoDB = async (payload) => {
-    const { items, ...orderData } = payload;
+    // Coupons can only be validated for signed-in users, so guest orders never
+    // carry a discount.
+    const { items, couponCode: _couponCode, ...orderData } = payload;
     if (!items || items.length === 0) {
         throw new AppError_1.default(http_status_1.default.BAD_REQUEST, "Cart is empty");
     }
@@ -671,8 +746,8 @@ const placeGuestOrderIntoDB = async (payload) => {
         if (!product) {
             throw new AppError_1.default(http_status_1.default.NOT_FOUND, `Product not found`);
         }
-        // Skip stock validation for preorder items
-        if (!product.isPreOrder) {
+        // Skip stock validation for Group Buy lines
+        if (!isGroupBuyLine(product, item)) {
             const requestedQty = item.item_quantity || item.quantity;
             const availableStock = product.stock ?? 0;
             if (!product.inStock || availableStock < requestedQty) {
@@ -694,14 +769,19 @@ const placeGuestOrderIntoDB = async (payload) => {
         if (!product) {
             throw new AppError_1.default(http_status_1.default.NOT_FOUND, `Product not found`);
         }
-        const itemTotal = product.price * (item.item_quantity || item.quantity);
+        const isGroupBuy = isGroupBuyLine(product, item);
+        const unitPrice = getUnitSellingPrice(product, isGroupBuy);
+        const quantity = item.item_quantity || item.quantity;
         return {
             product,
-            quantity: item.item_quantity || item.quantity,
+            quantity,
             selectedColor: item.item_color || item.selectedColor,
-            subtotal: itemTotal,
+            isGroupBuy,
+            unitPrice,
+            subtotal: unitPrice * quantity,
         };
     }));
+    Object.assign(orderData, await resolveOrderPricing(productDetails, undefined, undefined));
     // Normalize phone number
     if (orderData.phone) {
         orderData.phone = normalizePhoneNumber(orderData.phone);
@@ -722,18 +802,29 @@ const placeGuestOrderIntoDB = async (payload) => {
     // Compute deposit/balance data for guest orders
     const depositInfo = calculateDepositBreakdown(productDetails, orderData.totalPayable || 0);
     validateOrderPayment(orderData.paymentMethod, orderData.transactionId, depositInfo.isPreOrderOrder);
+    // Gateway orders get their transaction reference from the verified EPS
+    // callback, never from the client.
+    if (GATEWAY_PAYMENT_METHODS.includes(orderData.paymentMethod)) {
+        orderData.transactionId = undefined;
+    }
     Object.assign(orderData, depositInfo, {
         depositPaid: 0,
         balancePaid: 0,
     });
+    resetOrderLifecycleFields(orderData);
     // Create order
     const order = await order_model_1.Order.create(orderData);
+    await payment_log_service_1.PaymentLogServices.logOrderPaymentChange({}, order, {
+        event: "created",
+        source: "system",
+        note: "Order placed",
+    });
     // Create order items
     const orderItemsData = productDetails.map((detail) => ({
         order: order._id,
         product: detail.product._id,
         productName: detail.product.name,
-        productPrice: detail.product.price,
+        productPrice: detail.unitPrice,
         buyingPrice: detail.product.buyingPrice || 0,
         quantity: detail.quantity,
         selectedColor: detail.selectedColor,

@@ -8,6 +8,7 @@ export interface TPrintingSaleItem {
 export interface TPrintingSale {
     _id?: string;
     saleNumber: string;
+    invoiceSerial?: string;
     customerName: string;
     phone: string;
     email?: string;
@@ -21,5 +22,19 @@ export interface TPrintingSale {
     createdBy: Types.ObjectId;
     createdAt?: Date;
     updatedAt?: Date;
+}
+export interface TPrintingSaleArchiveMonthSummary {
+    month: number;
+    monthName: string;
+    saleCount: number;
+    totalAmount: number;
+}
+export interface TPrintingSaleArchiveSummary {
+    year: number;
+    months: TPrintingSaleArchiveMonthSummary[];
+    totals: {
+        saleCount: number;
+        totalAmount: number;
+    };
 }
 //# sourceMappingURL=printing-sale.interface.d.ts.map

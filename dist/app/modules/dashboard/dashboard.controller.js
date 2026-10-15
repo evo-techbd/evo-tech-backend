@@ -84,7 +84,9 @@ const getMonthlyProfitBreakdown = (0, catchAsync_1.catchAsync)(async (req, res) 
 });
 const getOrdersWithProfit = (0, catchAsync_1.catchAsync)(async (req, res) => {
     const { year, month, page, limit } = req.query;
-    const result = await dashboard_service_1.DashboardServices.getOrdersWithProfit(Number(year) || new Date().getFullYear(), Number(month) || new Date().getMonth() + 1, Number(page) || 1, Number(limit) || 50);
+    // Current month in Bangladesh time (UTC+6), whatever the server's timezone
+    const dhakaNow = new Date(Date.now() + 6 * 60 * 60 * 1000);
+    const result = await dashboard_service_1.DashboardServices.getOrdersWithProfit(Number(year) || dhakaNow.getUTCFullYear(), Number(month) || dhakaNow.getUTCMonth() + 1, Number(page) || 1, Number(limit) || 50);
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.OK,
         success: true,

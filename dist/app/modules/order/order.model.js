@@ -3,6 +3,18 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.OrderItem = exports.Order = void 0;
 const mongoose_1 = require("mongoose");
 const uuid_1 = require("uuid");
+const epsPaymentAttemptSchema = new mongoose_1.Schema({
+    merchantTransactionId: { type: String, required: true },
+    epsTransactionId: { type: String },
+    amount: { type: Number, required: true },
+    status: {
+        type: String,
+        enum: ["initiated", "success", "failed", "cancelled", "amount_mismatch"],
+        default: "initiated",
+    },
+    financialEntity: { type: String },
+    verifiedAt: { type: Date },
+}, { _id: false, timestamps: { createdAt: true, updatedAt: false } });
 const orderSchema = new mongoose_1.Schema({
     orderNumber: {
         type: String,
@@ -91,6 +103,10 @@ const orderSchema = new mongoose_1.Schema({
     },
     bkashPaymentID: {
         type: String,
+    },
+    epsPayments: {
+        type: [epsPaymentAttemptSchema],
+        default: undefined,
     },
     terms: {
         type: Boolean,
@@ -249,6 +265,8 @@ orderSchema.index({ email: 1 });
 orderSchema.index({ phone: 1 });
 orderSchema.index({ trackingCode: 1 });
 orderSchema.index({ invoiceSerial: 1 });
+// EPS callbacks look the order up by the attempt's merchantTransactionId
+orderSchema.index({ "epsPayments.merchantTransactionId": 1 }, { sparse: true });
 // Common order item lookup paths
 orderItemSchema.index({ order: 1 });
 orderItemSchema.index({ product: 1 });

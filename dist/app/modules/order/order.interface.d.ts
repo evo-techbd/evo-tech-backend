@@ -7,6 +7,15 @@ export interface TPickupPoint {
     phone?: string;
     hours?: string;
 }
+export interface TEpsPaymentAttempt {
+    merchantTransactionId: string;
+    epsTransactionId?: string;
+    amount: number;
+    status: "initiated" | "success" | "failed" | "cancelled" | "amount_mismatch";
+    financialEntity?: string;
+    verifiedAt?: Date;
+    createdAt?: Date;
+}
 export interface TOrder {
     _id?: string;
     orderNumber: string;
@@ -29,6 +38,7 @@ export interface TOrder {
     transactionId?: string;
     bkashTransactionId?: string;
     bkashPaymentID?: string;
+    epsPayments?: TEpsPaymentAttempt[];
     terms: boolean;
     subtotal: number;
     discount: number;

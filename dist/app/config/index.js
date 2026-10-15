@@ -53,5 +53,17 @@ exports.default = {
     bkash_app_secret: process.env.BKASH_APP_SECRET,
     bkash_username: process.env.BKASH_USERNAME,
     bkash_password: process.env.BKASH_PASSWORD,
+    // Public URL of this API (no trailing slash, no /api/v1). EPS redirects the
+    // customer's browser back here after payment so we can verify server-side.
+    backend_url: (process.env.BACKEND_URL || "http://localhost:5000").replace(/\/+$/, ""),
+    // EPS Payment Gateway Configuration
+    eps_base_url: process.env.EPS_SANDBOX === "true"
+        ? "https://sandboxpgapi.eps.com.bd/v1"
+        : "https://pgapi.eps.com.bd/v1",
+    eps_username: process.env.EPS_USERNAME,
+    eps_password: process.env.EPS_PASSWORD,
+    eps_hash_key: process.env.EPS_HASH_KEY,
+    eps_merchant_id: process.env.EPS_MERCHANT_ID,
+    eps_store_id: process.env.EPS_STORE_ID,
 };
 //# sourceMappingURL=index.js.map

@@ -1,22 +1,36 @@
+import "../category/category.model";
 type DateRange = "today" | "this-week" | "this-month" | "all-time";
+type MissingBuyingPrice = {
+    productId: string | null;
+    slug: string | null;
+    name: string;
+    unitsSold: number;
+};
 export declare const DashboardServices: {
     getDashboardStats: (range?: DateRange) => Promise<{
-        totalRevenue: number;
+        totalRevenue: any;
         totalProfit: number;
-        profitGrowth: number;
-        totalOrders: number;
+        totalCost: any;
+        totalOrders: any;
         totalCustomers: number;
         totalProducts: number;
-        revenueGrowth: number;
-        ordersGrowth: number;
-        customersGrowth: number;
-        productsGrowth: number;
+        revenueGrowth: number | null;
+        profitGrowth: number | null;
+        ordersGrowth: number | null;
+        customersGrowth: number | null;
+        productsGrowth: number | null;
         orderBreakdown: Record<string, number>;
         revenueBreakdown: {
             orderRevenue: number;
-            printingRevenue: number;
+            printingRevenue: any;
             orderCount: number;
-            printingSalesCount: number;
+            printingSalesCount: any;
+        };
+        cashCollected: any;
+        receivables: {
+            amount: any;
+            ordersWithDue: any;
+            partialOrders: any;
         };
         excludedFees: {
             deliveryFees: number;
@@ -25,14 +39,15 @@ export declare const DashboardServices: {
         profitWarning: {
             message: string;
             itemsAffected: number;
+            products: MissingBuyingPrice[];
         } | null;
     }>;
     getSalesData: (period?: string) => Promise<{
         date: string;
-        sales: number;
-        orders: number;
-        orderSales: number;
-        printingSales: number;
+        sales: any;
+        orders: any;
+        orderSales: any;
+        printingSales: any;
     }[]>;
     getRecentOrders: (limit?: number) => Promise<{
         id: string;
@@ -40,44 +55,42 @@ export declare const DashboardServices: {
         customer: string;
         customerEmail: any;
         total: number;
-        status: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
+        status: "cancelled" | "pending" | "confirmed" | "processing" | "shipped" | "delivered";
         createdAt: Date | undefined;
     }[]>;
     getTopProducts: (limit?: number) => Promise<{
         id: string;
-        name: string;
-        image: string;
-        category: import("mongoose").Types.ObjectId;
-        price: number;
+        name: any;
+        image: any;
+        category: any;
+        price: any;
         sold: number;
         revenue: number;
-        stock: number;
-        trend: string;
+        stock: any;
+        periodDays: number;
     }[]>;
     getEarningsReport: () => Promise<{
         total: {
             earnings: any;
-            orders: number;
+            orders: any;
         };
         yearly: {
-            earnings: any;
-            orders: number;
-            growth: number;
+            growth: number | null;
             breakdown: {
-                [x: string]: number;
                 earnings: number;
                 orders: number;
             }[];
+            earnings: any;
+            orders: any;
         };
         monthly: {
-            earnings: any;
-            orders: number;
-            growth: number;
+            growth: number | null;
             breakdown: {
-                [x: string]: number;
                 earnings: number;
                 orders: number;
             }[];
+            earnings: any;
+            orders: any;
         };
         avgOrderValue: number;
     }>;
@@ -108,6 +121,11 @@ export declare const DashboardServices: {
             printingRevenue: number;
             printingOrders: number;
         };
+        profitWarning: {
+            message: string;
+            itemsAffected: number;
+            products: MissingBuyingPrice[];
+        } | null;
     }>;
     getOrdersWithProfit: (year: number, month: number, page?: number, limit?: number) => Promise<{
         orders: {
@@ -117,10 +135,10 @@ export declare const DashboardServices: {
             email: string;
             phone: string;
             orderDate: Date | undefined;
-            orderStatus: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
-            paymentStatus: "partial" | "pending" | "paid" | "failed" | "refunded";
+            orderStatus: "cancelled" | "pending" | "confirmed" | "processing" | "shipped" | "delivered";
+            paymentStatus: "partial" | "failed" | "pending" | "paid" | "refunded";
             revenue: number;
-            cost: number;
+            cost: any;
             profit: number;
             deliveryCharge: number;
             additionalCharge: number;

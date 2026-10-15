@@ -22,6 +22,13 @@ declare const _default: {
     bkash_app_secret: string | undefined;
     bkash_username: string | undefined;
     bkash_password: string | undefined;
+    backend_url: string;
+    eps_base_url: string;
+    eps_username: string | undefined;
+    eps_password: string | undefined;
+    eps_hash_key: string | undefined;
+    eps_merchant_id: string | undefined;
+    eps_store_id: string | undefined;
 };
 export default _default;
 //# sourceMappingURL=index.d.ts.map

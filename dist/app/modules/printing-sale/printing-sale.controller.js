@@ -40,7 +40,7 @@ const getSingleSale = (0, catchAsync_1.catchAsync)(async (req, res) => {
     });
 });
 const updatePaymentStatus = (0, catchAsync_1.catchAsync)(async (req, res) => {
-    const result = await printing_sale_service_1.PrintingSaleServices.updateSalePaymentStatus(req.params.id, req.body.paymentStatus);
+    const result = await printing_sale_service_1.PrintingSaleServices.updateSalePaymentStatus(req.params.id, req.body.paymentStatus, req.user?._id);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_1.default.OK,
@@ -58,11 +58,30 @@ const deleteSale = (0, catchAsync_1.catchAsync)(async (req, res) => {
     });
 });
 const updateSale = (0, catchAsync_1.catchAsync)(async (req, res) => {
-    const result = await printing_sale_service_1.PrintingSaleServices.updateSale(req.params.id, req.body);
+    const result = await printing_sale_service_1.PrintingSaleServices.updateSale(req.params.id, req.body, req.user?._id);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_1.default.OK,
         message: "Printing sale updated successfully",
+        data: result,
+    });
+});
+const getArchiveSummary = (0, catchAsync_1.catchAsync)(async (req, res) => {
+    const year = req.query.year ? Number(req.query.year) : undefined;
+    const result = await printing_sale_service_1.PrintingSaleServices.getArchiveSummary(year);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_1.default.OK,
+        message: "Printing sale archive summary retrieved successfully",
+        data: result,
+    });
+});
+const getArchiveYears = (0, catchAsync_1.catchAsync)(async (req, res) => {
+    const result = await printing_sale_service_1.PrintingSaleServices.getArchiveYears();
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_1.default.OK,
+        message: "Printing sale archive years retrieved successfully",
         data: result,
     });
 });
@@ -73,5 +92,7 @@ exports.PrintingSaleControllers = {
     updatePaymentStatus,
     updateSale,
     deleteSale,
+    getArchiveSummary,
+    getArchiveYears,
 };
 //# sourceMappingURL=printing-sale.controller.js.map

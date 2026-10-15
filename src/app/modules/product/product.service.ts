@@ -937,7 +937,7 @@ const getAllFeaturedSectionsFromDB = async () => {
     .populate("subcategory", "name slug")
     .populate({
       path: "products",
-      select: "name slug price previousPrice preOrderPrice  mainImage",
+      select: "name slug price previousPrice preOrderPrice isPreOrder inStock mainImage",
       match: { published: true },
     })
     .lean(); // Add lean() to get plain JavaScript objects

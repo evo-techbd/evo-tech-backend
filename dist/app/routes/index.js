@@ -32,6 +32,8 @@ const pickuppoint_route_1 = require("../modules/pickuppoint/pickuppoint.route");
 const trash_route_1 = require("../modules/trash/trash.route");
 const printing_sale_route_1 = require("../modules/printing-sale/printing-sale.route");
 const settings_route_1 = require("../modules/settings/settings.route");
+const print_pricing_route_1 = require("../modules/print-pricing/print-pricing.route");
+const product_group_route_1 = require("../modules/product-group/product-group.route");
 const router = express_1.default.Router();
 const adminRouter = express_1.default.Router();
 // Admin prefix aliases to match frontend expectations
@@ -153,6 +155,14 @@ const moduleRoutes = [
     {
         path: "/settings",
         route: settings_route_1.SettingsRoutes,
+    },
+    {
+        path: "/print-pricing",
+        route: print_pricing_route_1.PrintPricingRoutes,
+    },
+    {
+        path: "/product-groups",
+        route: product_group_route_1.ProductGroupRoutes,
     },
     {
         path: "/admin",

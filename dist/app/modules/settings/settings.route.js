@@ -15,5 +15,9 @@ const router = express_1.default.Router();
 router.get("/delivery-charge", settings_controller_1.SettingsController.getDeliveryChargeSettings);
 // Admin/Employee only
 router.patch("/delivery-charge", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN, user_constant_1.USER_ROLE.EMPLOYEE), (0, validateRequest_1.default)(settings_validation_1.SettingsValidation.updateDeliveryChargeValidationSchema), settings_controller_1.SettingsController.updateDeliveryChargeSettings);
+// Public route - contact info shown across the storefront
+router.get("/contact", settings_controller_1.SettingsController.getContactSettings);
+// Admin/Employee only
+router.patch("/contact", (0, auth_1.default)(user_constant_1.USER_ROLE.ADMIN, user_constant_1.USER_ROLE.EMPLOYEE), (0, validateRequest_1.default)(settings_validation_1.SettingsValidation.updateContactSettingsValidationSchema), settings_controller_1.SettingsController.updateContactSettings);
 exports.SettingsRoutes = router;
 //# sourceMappingURL=settings.route.js.map

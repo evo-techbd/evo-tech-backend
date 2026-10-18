@@ -18,4 +18,15 @@ router.patch(
   SettingsController.updateDeliveryChargeSettings
 );
 
+// Public route - contact info shown across the storefront
+router.get("/contact", SettingsController.getContactSettings);
+
+// Admin/Employee only
+router.patch(
+  "/contact",
+  auth(USER_ROLE.ADMIN, USER_ROLE.EMPLOYEE),
+  validateRequest(SettingsValidation.updateContactSettingsValidationSchema),
+  SettingsController.updateContactSettings
+);
+
 export const SettingsRoutes = router;

@@ -27,6 +27,8 @@ import { PickupPointRoutes } from "../modules/pickuppoint/pickuppoint.route";
 import { TrashRoutes } from "../modules/trash/trash.route";
 import { PrintingSaleRoutes } from "../modules/printing-sale/printing-sale.route";
 import { SettingsRoutes } from "../modules/settings/settings.route";
+import { PrintPricingRoutes } from "../modules/print-pricing/print-pricing.route";
+import { ProductGroupRoutes } from "../modules/product-group/product-group.route";
 
 const router = express.Router();
 const adminRouter = express.Router();
@@ -151,6 +153,14 @@ const moduleRoutes = [
   {
     path: "/settings",
     route: SettingsRoutes,
+  },
+  {
+    path: "/print-pricing",
+    route: PrintPricingRoutes,
+  },
+  {
+    path: "/product-groups",
+    route: ProductGroupRoutes,
   },
   {
     path: "/admin",

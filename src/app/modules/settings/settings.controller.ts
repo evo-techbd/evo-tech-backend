@@ -29,7 +29,33 @@ const updateDeliveryChargeSettings = catchAsync(async (req, res) => {
   });
 });
 
+// Get contact info (public - footer, contact and services pages)
+const getContactSettings = catchAsync(async (req, res) => {
+  const result = await SettingsService.getContactSettingsFromDB();
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Contact settings retrieved successfully",
+    data: result,
+  });
+});
+
+// Update contact info (admin only)
+const updateContactSettings = catchAsync(async (req, res) => {
+  const result = await SettingsService.updateContactSettingsIntoDB(req.body);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Contact settings updated successfully",
+    data: result,
+  });
+});
+
 export const SettingsController = {
   getDeliveryChargeSettings,
   updateDeliveryChargeSettings,
+  getContactSettings,
+  updateContactSettings,
 };

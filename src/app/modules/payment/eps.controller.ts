@@ -24,6 +24,10 @@ const FALLBACK_CUSTOMER_EMAIL = "evotech.bd22@gmail.com";
 const FALLBACK_POSTCODE = "1206";
 // Cap on gateway calls when reconciling a customer's earlier attempts
 const MAX_ATTEMPTS_TO_RECONCILE = 3;
+// InitializeEPS intermittently rejects valid requests with a generic error
+// (seen on ~50% of sandbox calls, in streaks), so retry before failing checkout.
+const MAX_INIT_TRIES = 5;
+const INIT_RETRY_DELAY_MS = 1_500;
 
 // 13-digit ms timestamp + 4 random digits: numeric and unique, as EPS expects
 const generateMerchantTransactionId = () =>
@@ -260,74 +264,90 @@ const initiateEpsPayment = catchAsync(async (req: Request, res: Response) => {
     );
   }
 
-  const merchantTransactionId = generateMerchantTransactionId();
-  // Persist the attempt before redirecting so the callback can always find it
-  await Order.updateOne(
-    { _id: freshOrder._id },
-    { $push: { epsPayments: { merchantTransactionId, amount } } },
-  );
-
   const callbackBase = `${config.backend_url}/api/v1/payment/eps/callback`;
   const orderRef = freshOrder.orderNumber;
   const isDeposit = depositOutstanding > 0 && !!freshOrder.isPreOrderOrder;
   const productName = `Evo-Tech order ${orderRef}${isDeposit ? " (advance)" : ""}`;
 
-  try {
-    const result = await EpsService.initializePayment({
-      customerOrderId: orderRef,
-      merchantTransactionId,
-      totalAmount: amount,
-      successUrl: `${callbackBase}/success/${merchantTransactionId}`,
-      failUrl: `${callbackBase}/fail/${merchantTransactionId}`,
-      cancelUrl: `${callbackBase}/cancel/${merchantTransactionId}`,
-      customerName:
-        `${freshOrder.firstname} ${freshOrder.lastname || ""}`.trim(),
-      customerEmail: freshOrder.email || FALLBACK_CUSTOMER_EMAIL,
-      customerPhone: toEpsPhone(freshOrder.phone),
-      customerAddress: freshOrder.houseStreet,
-      customerCity: freshOrder.city,
-      customerState: freshOrder.subdistrict || freshOrder.city,
-      customerPostcode: freshOrder.postcode || FALLBACK_POSTCODE,
-      productName,
-      noOfItem: 1,
-      productList: [
+  let lastError: unknown;
+  for (let tryNo = 1; tryNo <= MAX_INIT_TRIES; tryNo++) {
+    const merchantTransactionId = generateMerchantTransactionId();
+    // Persist the attempt before redirecting so the callback can always find it
+    await Order.updateOne(
+      { _id: freshOrder._id },
+      { $push: { epsPayments: { merchantTransactionId, amount } } },
+    );
+
+    try {
+      const result = await EpsService.initializePayment({
+        // EPS rejects a CustomerOrderId it has already initialized, so every
+        // attempt (including a retry after a cancel) gets its own
+        customerOrderId: `${orderRef}-${merchantTransactionId.slice(-6)}`,
+        merchantTransactionId,
+        totalAmount: amount,
+        successUrl: `${callbackBase}/success/${merchantTransactionId}`,
+        failUrl: `${callbackBase}/fail/${merchantTransactionId}`,
+        cancelUrl: `${callbackBase}/cancel/${merchantTransactionId}`,
+        customerName:
+          `${freshOrder.firstname} ${freshOrder.lastname || ""}`.trim(),
+        customerEmail: freshOrder.email || FALLBACK_CUSTOMER_EMAIL,
+        customerPhone: toEpsPhone(freshOrder.phone),
+        customerAddress: freshOrder.houseStreet,
+        customerCity: freshOrder.city,
+        customerState: freshOrder.subdistrict || freshOrder.city,
+        customerPostcode: freshOrder.postcode || FALLBACK_POSTCODE,
+        productName,
+        noOfItem: 1,
+        productList: [
+          {
+            ProductName: productName,
+            NoOfItem: "1",
+            ProductProfile: "general",
+            ProductCategory: "general",
+            ProductPrice: amount.toFixed(2),
+          },
+        ],
+        ipAddress: req.ip,
+        valueA: String(freshOrder._id),
+      });
+
+      await Order.updateOne(
         {
-          ProductName: productName,
-          NoOfItem: "1",
-          ProductProfile: "general",
-          ProductCategory: "general",
-          ProductPrice: amount.toFixed(2),
+          _id: freshOrder._id,
+          "epsPayments.merchantTransactionId": merchantTransactionId,
         },
-      ],
-      ipAddress: req.ip,
-      valueA: String(freshOrder._id),
-    });
+        { $set: { "epsPayments.$.epsTransactionId": result.TransactionId } },
+      );
 
-    await Order.updateOne(
-      {
-        _id: freshOrder._id,
-        "epsPayments.merchantTransactionId": merchantTransactionId,
-      },
-      { $set: { "epsPayments.$.epsTransactionId": result.TransactionId } },
-    );
+      return sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: "Payment session created",
+        data: { redirectURL: result.RedirectURL, amount },
+      });
+    } catch (error) {
+      // No payment page was handed out for this ID, so there's nothing to
+      // reconcile later; drop it rather than crowd out real attempts.
+      await Order.updateOne(
+        { _id: freshOrder._id },
+        { $pull: { epsPayments: { merchantTransactionId } } },
+      );
+      lastError = error;
 
-    sendResponse(res, {
-      statusCode: httpStatus.OK,
-      success: true,
-      message: "Payment session created",
-      data: { redirectURL: result.RedirectURL, amount },
-    });
-  } catch (error) {
-    await Order.updateOne(
-      {
-        _id: freshOrder._id,
-        "epsPayments.merchantTransactionId": merchantTransactionId,
-      },
-      { $set: { "epsPayments.$.status": "failed" } },
-    );
-    throw error;
+      const isGatewayError =
+        error instanceof AppError && error.statusCode === httpStatus.BAD_GATEWAY;
+      if (!isGatewayError) break;
+      if (tryNo < MAX_INIT_TRIES) {
+        console.warn(
+          `EPS init try ${tryNo}/${MAX_INIT_TRIES} failed for ${orderRef}, retrying`,
+        );
+        await new Promise((r) => setTimeout(r, INIT_RETRY_DELAY_MS));
+      }
+    }
   }
+  throw lastError;
 });
+
 
 /**
  * EPS sends the customer's browser here (GET or POST) after payment. The

@@ -24,6 +24,7 @@ declare const _default: {
     bkash_password: string | undefined;
     backend_url: string;
     eps_base_url: string;
+    eps_callback_base_url: string;
     eps_username: string | undefined;
     eps_password: string | undefined;
     eps_hash_key: string | undefined;

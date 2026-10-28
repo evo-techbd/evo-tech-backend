@@ -14,6 +14,7 @@ declare class EpsService {
     private assertConfigured;
     private generateHash;
     private request;
+    private readTokenExpiry;
     private getToken;
     /**
      * Create a payment session and get the hosted payment page URL.

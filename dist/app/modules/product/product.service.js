@@ -338,6 +338,9 @@ const updateProductIntoDB = async (id, payload, mainImageBuffer, additionalImage
         payload.brand === undefined) {
         delete payload.brand;
     }
+    // Partial updates (publish / Group Buy toggles) omit landingpageSectionId and
+    // must leave the section link alone; an explicit "" means "remove from section"
+    const sectionFieldSent = "landingpageSectionId" in payload;
     if (payload.landingpageSectionId === "" ||
         payload.landingpageSectionId === null ||
         payload.landingpageSectionId === undefined) {
@@ -446,20 +449,24 @@ const updateProductIntoDB = async (id, payload, mainImageBuffer, additionalImage
         delete payload.removeImages;
     }
     // Handle landingpageSectionId changes - maintain two-way relationship
-    const oldSectionId = product.landingpageSectionId?.toString();
-    const newSectionId = payload.landingpageSectionId?.toString();
-    // If the section assignment changed
-    if (oldSectionId !== newSectionId) {
+    if (sectionFieldSent) {
+        const oldSectionId = product.landingpageSectionId?.toString();
+        const newSectionId = payload.landingpageSectionId?.toString();
         // Remove product from old section
-        if (oldSectionId) {
+        if (oldSectionId && oldSectionId !== newSectionId) {
             await landingsection_model_1.LandingSection.findByIdAndUpdate(oldSectionId, {
                 $pull: { products: id },
             });
         }
-        // Add product to new section
-        if (newSectionId && newSectionId !== "") {
+        if (newSectionId) {
+            // Always add (not only on change) so re-saving repairs a lost link
             await landingsection_model_1.LandingSection.findByIdAndUpdate(newSectionId, {
                 $addToSet: { products: id }, // $addToSet prevents duplicates
+            });
+        }
+        else if (oldSectionId) {
+            await product_model_1.Product.findByIdAndUpdate(id, {
+                $unset: { landingpageSectionId: 1 },
             });
         }
     }

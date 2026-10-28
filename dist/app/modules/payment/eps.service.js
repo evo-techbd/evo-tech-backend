@@ -55,11 +55,21 @@ class EpsService {
                 headers: { "Content-Type": "application/json", ...init.headers },
                 body: init.body === undefined ? undefined : JSON.stringify(init.body),
                 signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+                // EPS answers an expired/invalid token with a 302 to a login page;
+                // following it would turn the rejection into an empty 200
+                redirect: "manual",
             });
         }
         catch (error) {
             console.error(`EPS ${path} request failed:`, error);
             throw new AppError_1.default(http_status_1.default.BAD_GATEWAY, "Could not reach the payment gateway. Please try again.");
+        }
+        if (response.status === 401 ||
+            (response.status >= 300 && response.status < 400)) {
+            // A rejected token must not be reused by the next attempt
+            this.tokenCache = { token: null, expiresAt: 0 };
+            console.error(`EPS ${path} rejected the token (HTTP ${response.status})`);
+            throw new AppError_1.default(http_status_1.default.BAD_GATEWAY, "Payment gateway authentication failed.");
         }
         const text = await response.text();
         let data;
@@ -76,6 +86,15 @@ class EpsService {
         }
         return data;
     }
+    readTokenExpiry(token) {
+        try {
+            const payload = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"));
+            return typeof payload.exp === "number" ? payload.exp * 1000 : 0;
+        }
+        catch {
+            return 0;
+        }
+    }
     async getToken() {
         if (this.tokenCache.token && Date.now() < this.tokenCache.expiresAt) {
             return this.tokenCache.token;
@@ -89,12 +108,13 @@ class EpsService {
             console.error("EPS GetToken failed:", data.errorCode, data.errorMessage);
             throw new AppError_1.default(http_status_1.default.BAD_GATEWAY, "Payment gateway authentication failed.");
         }
-        const expiry = new Date(data.expireDate).getTime();
+        // Use the JWT's own exp claim: expireDate is Bangladesh local time with no
+        // offset, so it reads 6h late on a UTC server. The sandbox issues tokens
+        // whose exp is the issue time (they die ~5 min later), which this treats
+        // as uncacheable — a fresh token per request.
         this.tokenCache = {
             token: data.token,
-            expiresAt: Number.isFinite(expiry)
-                ? expiry - TOKEN_EXPIRY_SKEW_MS
-                : Date.now() + 10 * 60000,
+            expiresAt: this.readTokenExpiry(data.token) - TOKEN_EXPIRY_SKEW_MS,
         };
         return data.token;
     }

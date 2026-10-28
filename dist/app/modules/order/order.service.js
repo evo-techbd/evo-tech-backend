@@ -147,6 +147,18 @@ const hydratePickupPointsForOrders = async (orders) => {
     });
 };
 const roundToTwo = (value) => Math.round(value * 100) / 100;
+// EPS deducts its fee from each settlement, so it's passed on to the customer.
+// Flat card rate (the highest EPS charges), since the customer only picks the
+// channel on the EPS page. Mirrors frontend/utils/essential_functions.ts#getEPSCharge.
+const EPS_CHARGE_RATE = 0.022;
+const applyEpsCharge = (orderData) => {
+    if (orderData.paymentMethod !== "eps")
+        return;
+    const chargeableAmount = Math.max((orderData.subtotal || 0) -
+        (orderData.discount || 0) +
+        (orderData.deliveryCharge || 0), 0);
+    orderData.additionalCharge = Math.round(chargeableAmount * EPS_CHARGE_RATE);
+};
 // Group Buy is live only while the admin toggle is on and the Group Buy price
 // is a real discount — mirrors frontend/utils/product-pricing.ts.
 const isGroupBuyActive = (product) => product?.isPreOrder === true &&
@@ -308,6 +320,7 @@ const placeOrderIntoDB = async (payload, userUuid, couponUserId) => {
     // Recompute delivery charge server-side from admin-configured settings
     // rather than trusting the client-submitted value
     orderData.deliveryCharge = await resolveDeliveryCharge(orderData.shippingType, orderData.city, productDetails);
+    applyEpsCharge(orderData);
     orderData.totalPayable = roundToTwo(Math.max((orderData.subtotal || 0) -
         (orderData.discount || 0) +
         orderData.deliveryCharge +
@@ -795,6 +808,7 @@ const placeGuestOrderIntoDB = async (payload) => {
     // Recompute delivery charge server-side from admin-configured settings
     // rather than trusting the client-submitted value
     orderData.deliveryCharge = await resolveDeliveryCharge(orderData.shippingType, orderData.city, productDetails);
+    applyEpsCharge(orderData);
     orderData.totalPayable = roundToTwo(Math.max((orderData.subtotal || 0) -
         (orderData.discount || 0) +
         orderData.deliveryCharge +

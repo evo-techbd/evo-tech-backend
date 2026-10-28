@@ -264,7 +264,7 @@ const initiateEpsPayment = catchAsync(async (req: Request, res: Response) => {
     );
   }
 
-  const callbackBase = `${config.backend_url}/api/v1/payment/eps/callback`;
+  const callbackBase = `${config.eps_callback_base_url}/api/payment/eps/callback`;
   const orderRef = freshOrder.orderNumber;
   const isDeposit = depositOutstanding > 0 && !!freshOrder.isPreOrderOrder;
   const productName = `Evo-Tech order ${orderRef}${isDeposit ? " (advance)" : ""}`;

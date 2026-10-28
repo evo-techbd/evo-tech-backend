@@ -62,6 +62,13 @@ export default {
     process.env.EPS_SANDBOX === "true"
       ? "https://sandboxpgapi.eps.com.bd/v1"
       : "https://pgapi.eps.com.bd/v1",
+  // EPS rejects return URLs outside the merchant's registered domain, so the
+  // callbacks go through the storefront (proxied back here by a Next rewrite)
+  eps_callback_base_url: (
+    process.env.EPS_CALLBACK_BASE_URL ||
+    process.env.FRONTEND_URL ||
+    "http://localhost:3000"
+  ).replace(/\/+$/, ""),
   eps_username: process.env.EPS_USERNAME,
   eps_password: process.env.EPS_PASSWORD,
   eps_hash_key: process.env.EPS_HASH_KEY,
